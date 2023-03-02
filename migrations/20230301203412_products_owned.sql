@@ -1,4 +1,5 @@
 -- Add migration script here
+-- Fix constraint
 CREATE TABLE products_owned(
     bought_at timestamp NOT NULL,
     id uuid PRIMARY KEY NOT NULL,

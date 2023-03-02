@@ -78,8 +78,9 @@ impl DatabaseHand {
         let pool = pool.clone();
         let boxes = sqlx::query_as!(DBox, "SELECT * FROM box WHERE listing_id = $1", listing_id)
             .fetch_all(&pool).await?;
-        for box in boxes {
-            
+
+        for b in boxes {
+            todo!()
         }
         Ok(final_boxes)
     }
