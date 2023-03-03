@@ -6,6 +6,7 @@ use crate::{
     database::actions::DatabaseHand,
     error::ApiError,
     models::{Listing, ResponseUser, User},
+    web::{ImageData, ReqId},
     State,
 };
 use tokio::fs::File as AsyncFile;
@@ -73,7 +74,16 @@ pub async fn create_listing(
             }
         }
     }
-    todo!();
+
+    let listing = req_list.clone().into();
+    let req_id: ReqId = req_list.into();
+    let image_data = ImageData {
+        path: file_name,
+        id: req_id.id.clone(),
+    };
+
+    let listings = DatabaseHand::create_listing(&pool, (listing, req_id, image_data)).await?;
+    Ok(Json(listings))
 }
 
 pub async fn stream_to_file<S, E>(path: &str, stream: S) -> Result<(), (StatusCode, String)>
