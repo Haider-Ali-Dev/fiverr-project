@@ -1,6 +1,55 @@
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::Json;
+use serde::Serialize;
+use bcrypt::BcryptError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error("An error occurred in the database.")]
-    DatabaseError(#[from] sqlx::Error)
+    DatabaseError(#[from] sqlx::Error),
+    #[error("Incorrect Password")]
+    IncorrectPassword(#[from] BcryptError),
+    #[error("User is not a superuser")]
+    NotSuperuser
 }
+
+
+#[derive(Serialize)]
+pub struct ErrorBody {
+    error: String,
+    status_code: u16,
+}
+
+impl IntoResponse for ErrorBody {
+    fn into_response(self) -> axum::response::Response {
+        Json(self).into_response()
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> axum::response::Response {
+        let (status, error_msg) = match self {
+            ApiError::DatabaseError(a) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Something went wrong in the server. {a}"),
+            ),
+            ApiError::IncorrectPassword(_) => (
+                StatusCode::BAD_REQUEST,
+                format!("Incorrct passsword")
+            ),
+            ApiError::NotSuperuser => (
+                StatusCode::BAD_REQUEST,
+                format!("User is not a superuser.")
+            )
+        };
+
+        let body = ErrorBody {
+            error: error_msg,
+            status_code: status.as_u16(),
+        };
+
+        (status, body).into_response()
+    }
+}
+

@@ -9,6 +9,7 @@ pub struct User {
     pub created_at: NaiveDateTime,
     pub id: Uuid,
     pub points: i32,
+    pub is_superuser: bool
 }
 
 #[derive(Debug, Clone)]
@@ -18,13 +19,49 @@ pub struct Listing {
     pub created_at: NaiveDateTime,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Box {
     pub id: Uuid,
     pub price: i32,
     pub listing_id: Uuid,
-    pub created_at:  NaiveDateTime
+    pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone)]
+pub struct Product {
+    pub box_id: Uuid,
+    pub title: String,
+    pub id: Uuid,
+    pub description: String,
+    pub level: i32,
+    pub status: bool,
+    pub created_at: NaiveDateTime,
+}
+
+impl From<Box> for models::Box {
+    fn from(value: Box) -> Self {
+        Self {
+            id: value.id,
+            price: value.price as u32,
+            listing_id: value.listing_id,
+            created_at: value.created_at,
+            products: vec![],
+            total: 0,
+            available_products: 0,
+        }
+    }
+}
+impl From<Product> for models::Product {
+    fn from(value: Product) -> Self {
+        Self {
+            box_id: value.box_id,
+            title: value.title,
+            description: value.description,
+            level: value.level as u32,
+            status: value.status,
+            created_at: value.created_at,
+        }
+    }
 }
 
 impl From<Listing> for models::Listing {
@@ -42,6 +79,7 @@ impl From<Listing> for models::Listing {
 impl From<User> for models::ResponseUser {
     fn from(value: User) -> Self {
         Self {
+            is_superuser: value.is_superuser,
             username: value.username,
             email: value.email,
             id: value.id,

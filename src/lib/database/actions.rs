@@ -1,11 +1,13 @@
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, ResponseUser, User},
+    models::{Amount, Box, Listing, Product, ResponseUser, User},
+    web::{ReqId, SignIn},
 };
-use sqlx::pool;
 use uuid::Uuid;
 pub type Pool = sqlx::Pool<sqlx::postgres::Postgres>;
-use crate::database::models::{Box as DBox, Listing as DListing, User as DBUser};
+use crate::database::models::{
+    Box as DBox, Listing as DListing, Product as DProduct, User as DBUser,
+};
 pub struct DatabaseHand;
 
 type DResult<T> = Result<T, ApiError>;
@@ -19,11 +21,41 @@ impl DatabaseHand {
         Ok(user.into())
     }
 
+    pub async fn sign_in(pool: &Pool, signin: &SignIn) -> DResult<ResponseUser> {
+        let pool = pool.clone();
+        let password = sqlx::query!("SELECT password from users WHERE email = $1", signin.email)
+            .fetch_one(&pool)
+            .await?
+            .password;
+
+        match bcrypt::verify(signin.password.clone(), &password) {
+            Ok(true) => DatabaseHand::get_user_email(&pool, &signin.email).await,
+            Err(_) | Ok(false) => Err(ApiError::IncorrectPassword(
+                bcrypt::BcryptError::InvalidHash("Invalid Password".to_owned()),
+            )),
+        }
+    }
+
+    pub async fn get_user_email(pool: &Pool, email: &str) -> DResult<ResponseUser> {
+        let pool = pool.clone();
+        let mut user: ResponseUser = sqlx::query_as!(
+            DBUser,
+            "SELECT username, email, id, created_at, points, is_superuser from users WHERE email = $1",
+            email.clone()
+        )
+        .fetch_one(&pool)
+        .await?
+        .into();
+
+        let points = DatabaseHand::get_user_points(&pool, &user.id).await?;
+        user.points = points;
+        Ok(user)
+    }
     pub async fn get_user(pool: &Pool, id: Uuid) -> DResult<ResponseUser> {
         let pool = pool.clone();
         let mut user: ResponseUser = sqlx::query_as!(
             DBUser,
-            "SELECT username, email, id, created_at, points from users WHERE id = $1",
+            "SELECT username, email, id, created_at, points, is_superuser from users WHERE id = $1",
             id.clone()
         )
         .fetch_one(&pool)
@@ -69,19 +101,79 @@ impl DatabaseHand {
             .await?;
         for listing in listings {
             let mut listing: Listing = listing.into();
+            let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
+            listing.box_count = bxs.len() as u32;
+            listing.boxes = bxs;
+            final_listings.push(listing);
         }
         Ok(final_listings)
     }
 
     pub async fn get_boxes_of_listing(pool: &Pool, listing_id: &Uuid) -> DResult<Vec<Box>> {
-        let final_boxes = vec![];
+        let mut final_boxes = vec![];
         let pool = pool.clone();
         let boxes = sqlx::query_as!(DBox, "SELECT * FROM box WHERE listing_id = $1", listing_id)
-            .fetch_all(&pool).await?;
+            .fetch_all(&pool)
+            .await?;
 
         for b in boxes {
-            todo!()
+            let mut b: Box = b.into();
+            let products = DatabaseHand::get_products(&pool, &b.id).await?;
+            b.total = products.len() as u32;
+            let pro = products
+                .iter()
+                .filter(|p| p.status == false)
+                .map(|p| p.clone())
+                .collect::<Vec<_>>();
+            b.available_products = pro.len() as u32;
+            b.products = pro;
+            final_boxes.push(b);
         }
         Ok(final_boxes)
+    }
+
+    pub async fn get_products(pool: &Pool, box_id: &Uuid) -> DResult<Vec<Product>> {
+        let mut final_products = vec![];
+        let pool = pool.clone();
+        let products =
+            sqlx::query_as!(DProduct, "SELECT * FROM products WHERE box_id = $1", box_id)
+                .fetch_all(&pool)
+                .await?;
+
+        for pro in products {
+            let product: Product = pro.into();
+            final_products.push(product);
+        }
+
+        Ok(final_products)
+    }
+
+    async fn confirm_user_privilege(pool: &Pool, id: &ReqId) -> DResult<bool> {
+        let pool = pool.clone();
+        let is_superuser_rec = sqlx::query!("SELECT is_superuser FROM users WHERE id = $1", id.id)
+            .fetch_one(&pool)
+            .await?;
+        match is_superuser_rec.is_superuser {
+            true => Ok(true),
+            false => Err(ApiError::NotSuperuser),
+        }
+    }
+    pub async fn create_listing(pool: &Pool, data: (Listing, ReqId)) -> DResult<Vec<Listing>> {
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &data.1).await {
+            Ok(true) => {
+                sqlx::query!(
+                    "INSERT INTO listing (title, created_at, id) VALUES($1, $2, $3)",
+                    &data.0.title,
+                    &data.0.created_at,
+                    &data.0.id
+                )
+                .execute(&pool)
+                .await?;
+                let listings = DatabaseHand::get_listing(&pool).await?;
+                Ok(listings)
+            }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
     }
 }

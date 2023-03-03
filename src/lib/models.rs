@@ -42,10 +42,12 @@ pub struct User {
     pub created_at: NaiveDateTime,
     pub owned_products: Vec<Product>,
     pub points: u32,
+    pub is_superuser: bool
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseUser {
+    pub is_superuser: bool,
     pub username: String,
     pub email: String,
     pub id: Uuid,
@@ -64,6 +66,7 @@ pub struct Amount {
 impl From<User> for ResponseUser {
     fn from(value: User) -> Self {
         ResponseUser {
+            is_superuser: value.is_superuser,
             username: value.username,
             email: value.email,
             id: value.id,

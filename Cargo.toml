@@ -9,6 +9,7 @@ name = "api"
 path = "src/lib/mod.rs"
 [dependencies]
 axum = "0.6.9"
+bcrypt = "0.14.0"
 chrono = { version = "0.4.23", features = ["serde"] }
 serde = { version = "1.0.152", features = ["derive"] }
 
