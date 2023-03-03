@@ -38,15 +38,15 @@ impl IntoResponse for ApiError {
             ),
             ApiError::IncorrectPassword(_) => (
                 StatusCode::BAD_REQUEST,
-                format!("Incorrct passsword")
+                "Incorrct passsword".to_string()
             ),
             ApiError::NotSuperuser => (
                 StatusCode::BAD_REQUEST,
-                format!("User is not a superuser.")
+                "User is not a superuser.".to_string()
             ),
             ApiError::ImageError(_) => (
                 StatusCode::BAD_REQUEST,
-                format!("Error has been occured while parsing the image.")
+                "Error has been occured while parsing the image.".to_string()
             )
         };
 

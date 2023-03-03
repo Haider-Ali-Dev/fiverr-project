@@ -145,8 +145,7 @@ impl DatabaseHand {
             b.total = products.len() as u32;
             let pro = products
                 .iter()
-                .filter(|p| p.status == false)
-                .map(|p| p.clone())
+                .filter(|p| !p.status).cloned()
                 .collect::<Vec<_>>();
             b.available_products = pro.len() as u32;
             b.products = pro;
@@ -248,4 +247,6 @@ impl DatabaseHand {
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
         }
     }
+
+    
 }

@@ -1,11 +1,11 @@
-use std::{borrow::BorrowMut, str::FromStr};
+use std::{str::FromStr};
 
 use crate::{
     error::ApiError,
     models::{self, Listing, Product, User},
 };
 use bcrypt::{hash, DEFAULT_COST};
-use chrono::{NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -127,7 +127,7 @@ impl TryFrom<Register> for User {
             email: user.email,
             id: Uuid::new_v4(),
             password: hash_pass,
-            created_at: created_at,
+            created_at,
             owned_products: vec![],
             points: 0,
             is_superuser: false,

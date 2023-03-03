@@ -5,20 +5,20 @@ use axum::{extract::Multipart, http::StatusCode, Extension, Json};
 use crate::{
     database::actions::DatabaseHand,
     error::ApiError,
-    models::{Listing, ResponseUser, User},
+    models::{self, Listing, ResponseUser, User},
     web::{ImageData, ReqId},
     State,
 };
 use tokio::fs::File as AsyncFile;
 use tokio::io::BufWriter as AsyncBufWriter;
 
-use axum::body::{Body, Bytes, HttpBody};
+use axum::body::Bytes;
 use axum::BoxError;
 use futures::{Stream, TryStreamExt};
-use std::io::{BufWriter, Write};
-use tokio_util::io::{ReaderStream, StreamReader};
 
-use super::{Register, ReqListing, SignIn};
+use tokio_util::io::StreamReader;
+
+use super::{BoxCreation, Register, ReqListing, SignIn};
 
 pub async fn register_user(
     Extension(data): Extension<Arc<State>>,
@@ -41,8 +41,8 @@ pub async fn sign_in_user(
 }
 
 pub async fn create_listing(
-    mut form: Multipart,
     Extension(data): Extension<Arc<State>>,
+    mut form: Multipart,
 ) -> Result<Json<Vec<Listing>>, ApiError> {
     let pool = data.database.pool.clone();
     let mut req_list = ReqListing {
@@ -75,11 +75,11 @@ pub async fn create_listing(
         }
     }
 
-    let listing = req_list.clone().into();
+    let listing: Listing = req_list.clone().into();
     let req_id: ReqId = req_list.into();
     let image_data = ImageData {
         path: file_name,
-        id: req_id.id.clone(),
+        id: listing.clone().id,
     };
 
     let listings = DatabaseHand::create_listing(&pool, (listing, req_id, image_data)).await?;
@@ -105,4 +105,14 @@ where
     }
     .await
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+}
+
+pub async fn create_box(
+    Extension(data): Extension<Arc<State>>,
+    box_data: Json<BoxCreation>,
+) -> Result<Json<Vec<models::Box>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let box_data = box_data.0.into();
+    let bx = DatabaseHand::create_box(&pool, box_data).await?;
+    Ok(Json(bx))
 }
