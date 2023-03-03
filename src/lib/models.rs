@@ -16,6 +16,7 @@ pub struct Box {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Listing {
+    pub image: String,
     pub boxes: Vec<Box>,
     pub id: Uuid,
     pub title: String,
@@ -25,6 +26,7 @@ pub struct Listing {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
+    pub id: Uuid,
     pub box_id: Uuid,
     pub title: String,
     pub description: String,
@@ -62,6 +64,8 @@ pub struct Amount {
     pub user_id: Uuid,
     pub points: u32,
 }
+
+
 
 impl From<User> for ResponseUser {
     fn from(value: User) -> Self {

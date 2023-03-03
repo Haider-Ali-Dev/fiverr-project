@@ -11,7 +11,9 @@ pub enum ApiError {
     #[error("Incorrect Password")]
     IncorrectPassword(#[from] BcryptError),
     #[error("User is not a superuser")]
-    NotSuperuser
+    NotSuperuser,
+    #[error("Error has been occured while parsing image.")]
+    ImageError(#[from]  axum::extract::multipart::MultipartError) 
 }
 
 
@@ -41,6 +43,10 @@ impl IntoResponse for ApiError {
             ApiError::NotSuperuser => (
                 StatusCode::BAD_REQUEST,
                 format!("User is not a superuser.")
+            ),
+            ApiError::ImageError(_) => (
+                StatusCode::BAD_REQUEST,
+                format!("Error has been occured while parsing the image.")
             )
         };
 

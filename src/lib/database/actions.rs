@@ -1,23 +1,37 @@
 use crate::{
     error::ApiError,
     models::{Amount, Box, Listing, Product, ResponseUser, User},
-    web::{ReqId, SignIn},
+    web::{ImageData, ReqId, SignIn},
 };
 use uuid::Uuid;
 pub type Pool = sqlx::Pool<sqlx::postgres::Postgres>;
 use crate::database::models::{
     Box as DBox, Listing as DListing, Product as DProduct, User as DBUser,
 };
+
+/// This struct handles all the database queries.
 pub struct DatabaseHand;
 
+/// Alias for `Result` which guarantees that `Error` will always be `ApiError`
 type DResult<T> = Result<T, ApiError>;
 
 impl DatabaseHand {
     pub async fn create_user(pool: &Pool, user: &User) -> DResult<ResponseUser> {
         let pool = pool.clone();
         let user = user.clone();
-        sqlx::query!("INSERT INTO users(username, email, password, id, created_at) VALUES($1, $2, $3, $4, $5)",
-         user.username, user.email, user.password, user.id, user.created_at ).execute(&pool).await?;
+        sqlx::query!(
+            "INSERT INTO users(username, email, password, id, created_at, points, is_superuser)
+        VALUES($1, $2, $3, $4, $5, $6, $7)",
+            user.username,
+            user.email,
+            user.password,
+            user.id,
+            user.created_at,
+            user.points as i32,
+            user.is_superuser
+        )
+        .execute(&pool)
+        .await?;
         Ok(user.into())
     }
 
@@ -93,6 +107,13 @@ impl DatabaseHand {
         Ok(user)
     }
 
+    pub async fn get_image(pool: &Pool, id: &Uuid) -> DResult<String> {
+        let pool = pool.clone();
+        let image = sqlx::query!("SELECT path FROM images WHERE for_id = $1", id.clone())
+            .fetch_one(&pool)
+            .await?;
+        Ok(image.path)
+    }
     pub async fn get_listing(pool: &Pool) -> DResult<Vec<Listing>> {
         let mut final_listings: Vec<Listing> = vec![];
         let pool = pool.clone();
@@ -101,6 +122,8 @@ impl DatabaseHand {
             .await?;
         for listing in listings {
             let mut listing: Listing = listing.into();
+            let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
+            listing.image = listing_image;
             let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
             listing.box_count = bxs.len() as u32;
             listing.boxes = bxs;
@@ -158,7 +181,10 @@ impl DatabaseHand {
             false => Err(ApiError::NotSuperuser),
         }
     }
-    pub async fn create_listing(pool: &Pool, data: (Listing, ReqId)) -> DResult<Vec<Listing>> {
+    pub async fn create_listing(
+        pool: &Pool,
+        data: (Listing, ReqId, ImageData),
+    ) -> DResult<Vec<Listing>> {
         let pool = pool.clone();
         match DatabaseHand::confirm_user_privilege(&pool, &data.1).await {
             Ok(true) => {
@@ -170,9 +196,55 @@ impl DatabaseHand {
                 )
                 .execute(&pool)
                 .await?;
+                sqlx::query!(
+                    "INSERT INTO images (path, for_id) VALUES($1, $2)",
+                    data.2.path,
+                    data.2.id
+                )
+                .execute(&pool)
+                .await?;
                 let listings = DatabaseHand::get_listing(&pool).await?;
                 Ok(listings)
             }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
+    }
+
+    pub async fn create_box(pool: &Pool, data: (Box, Vec<Product>, ReqId)) -> DResult<Vec<Box>> {
+        let (bx, prods, req_id) = data;
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
+            Ok(true) => {
+                sqlx::query!(
+                    "INSERT INTO box (id, price, listing_id, created_at) VALUES ($1, $2, $3, $4)",
+                    bx.id,
+                    bx.price as i32,
+                    bx.listing_id,
+                    bx.created_at
+                )
+                .execute(&pool)
+                .await?;
+                for prod in prods {
+                    sqlx::query!(
+                        "INSERT INTO products
+                    (box_id, title, id, description, level, status, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                        prod.box_id,
+                        prod.title,
+                        prod.id,
+                        prod.description,
+                        prod.level as i32,
+                        prod.status,
+                        prod.created_at
+                    )
+                    .execute(&pool)
+                    .await?;
+                }
+
+                let bxs = DatabaseHand::get_boxes_of_listing(&pool, &bx.listing_id).await?;
+                Ok(bxs)
+            }
+
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
         }
     }

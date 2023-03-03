@@ -9,7 +9,7 @@ pub struct User {
     pub created_at: NaiveDateTime,
     pub id: Uuid,
     pub points: i32,
-    pub is_superuser: bool
+    pub is_superuser: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,9 @@ pub struct Product {
     pub created_at: NaiveDateTime,
 }
 
+
+
+
 impl From<Box> for models::Box {
     fn from(value: Box) -> Self {
         Self {
@@ -54,6 +57,7 @@ impl From<Box> for models::Box {
 impl From<Product> for models::Product {
     fn from(value: Product) -> Self {
         Self {
+            id: value.id,
             box_id: value.box_id,
             title: value.title,
             description: value.description,
@@ -72,6 +76,7 @@ impl From<Listing> for models::Listing {
             title: value.title,
             created_at: value.created_at,
             box_count: 0,
+            image: "".to_owned()
         }
     }
 }
