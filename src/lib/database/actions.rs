@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     error::ApiError,
     models::{Amount, Box, Listing, Product, ResponseUser, User},
@@ -145,7 +147,8 @@ impl DatabaseHand {
             b.total = products.len() as u32;
             let pro = products
                 .iter()
-                .filter(|p| !p.status).cloned()
+                .filter(|p| !p.status)
+                .cloned()
                 .collect::<Vec<_>>();
             b.available_products = pro.len() as u32;
             b.products = pro;
@@ -215,7 +218,7 @@ impl DatabaseHand {
         match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
             Ok(true) => {
                 sqlx::query!(
-                    "INSERT INTO box (id, price, listing_id, created_at) VALUES ($1, $2, $3, $4)",
+                    "INSERT INTO box (id, price, listing_id, created_at) VALUES ($1, $2, $3, $4) ",
                     bx.id,
                     bx.price as i32,
                     bx.listing_id,
@@ -228,7 +231,9 @@ impl DatabaseHand {
                         "INSERT INTO products
                     (box_id, title, id, description, level, status, created_at)
                      VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                        prod.box_id,
+                    // Remember that prod.box_id is a temporary id so we have 
+                    // to use `bx.id`
+                        bx.id,
                         prod.title,
                         prod.id,
                         prod.description,
@@ -248,5 +253,72 @@ impl DatabaseHand {
         }
     }
 
-    
+    // Deletion
+
+    pub async fn get_single_listing(pool: &Pool, listing_id: &Uuid) -> DResult<Listing> {
+        let pool = pool.clone();
+
+        let mut listing: Listing =
+            sqlx::query_as!(DListing, "SELECT * FROM listing WHERE id = $1", listing_id)
+                .fetch_one(&pool)
+                .await?
+                .into();
+        let listing_image = DatabaseHand::get_image(&pool, listing_id).await?;
+        listing.image = listing_image;
+        let bxs = DatabaseHand::get_boxes_of_listing(&pool, listing_id).await?;
+        listing.box_count = bxs.len() as u32;
+        listing.boxes = bxs;
+        Ok(listing)
+    }
+
+    pub async fn delete_box(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Listing> {
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &data.1).await {
+            Ok(true) => {
+                // Delete it's products
+                let id = sqlx::query!("SELECT listing_id FROM box WHERE id = $1", &data.0)
+                    .fetch_one(&pool)
+                    .await?;
+                sqlx::query!("DELETE FROM products WHERE box_id = $1", &data.0)
+                    .execute(&pool)
+                    .await?;
+
+                // Delete Box
+                sqlx::query!("DELETE FROM box where id = $1", &data.0)
+                    .execute(&pool)
+                    .await?;
+
+                let listing = DatabaseHand::get_single_listing(&pool, &id.listing_id).await?;
+                Ok(listing)
+            }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
+    }
+
+    pub async fn delete_listing(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Vec<Listing>> {
+        let (listing_id, req_id) = data;
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
+            Ok(true) => {
+                let box_ids = sqlx::query!("SELECT id FROM box WHERE listing_id = $1", listing_id)
+                    .fetch_all(&pool)
+                    .await?;
+                sqlx::query!("DELETE FROM box WHERE listing_id = $1", listing_id)
+                    .execute(&pool)
+                    .await?;
+                for box_id in box_ids {
+                    sqlx::query!("DELETE FROM products WHERE box_id = $1", box_id.id)
+                        .execute(&pool)
+                        .await?;
+                }
+
+                sqlx::query!("DELETE FROM listing WHERE id = $1 ", listing_id)
+                    .execute(&pool)
+                    .await?;
+                let listings = DatabaseHand::get_listing(&pool).await?;
+                Ok(listings)
+            }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
+    }
 }

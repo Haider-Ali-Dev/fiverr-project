@@ -29,6 +29,11 @@ pub struct ReqId {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ReqIdStr {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReqListing {
     pub req_id: String,
     pub image: String,
@@ -36,18 +41,17 @@ pub struct ReqListing {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProductData {
-    pub box_id: String,
     pub title: String,
     pub description: String,
     pub level: u32,
-    pub created_at: NaiveDateTime,
 }
 
 impl From<ProductData> for Product {
     fn from(p: ProductData) -> Self {
         Self {
             id: Uuid::new_v4(),
-            box_id: Uuid::from_str(&p.box_id).unwrap(),
+            // Temporary Id
+            box_id: Uuid::new_v4(),
             title: p.title,
             description: p.description,
             level: p.level,
@@ -66,7 +70,7 @@ pub struct BoxData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoxCreation {
-    req_id: ReqId,
+    req_id: ReqIdStr,
     box_data: BoxData,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,10 +97,16 @@ impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
             p_vec.push(prod);
         }
 
-        (bx, p_vec, data.req_id)
+        (bx, p_vec, data.req_id.into())
     }
 }
-
+impl From<ReqIdStr> for ReqId {
+    fn from(value: ReqIdStr) -> Self {
+        Self {
+            id: Uuid::from_str(&value.id).unwrap()
+        }
+    }
+}
 impl From<ReqListing> for Listing {
     fn from(list: ReqListing) -> Self {
         Self {
