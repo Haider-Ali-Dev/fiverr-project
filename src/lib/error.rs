@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use serde::Serialize;
 use bcrypt::BcryptError;
+use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
@@ -13,9 +13,12 @@ pub enum ApiError {
     #[error("User is not a superuser")]
     NotSuperuser,
     #[error("Error has been occured while parsing image.")]
-    ImageError(#[from]  axum::extract::multipart::MultipartError) 
+    ImageError(#[from] axum::extract::multipart::MultipartError),
+    #[error("Error has been occurred while selecting the product for the user.")]
+    SelectionError,
+    #[error("User has insufficient points.")]
+    InsufficientPoints,
 }
-
 
 #[derive(Serialize)]
 pub struct ErrorBody {
@@ -32,22 +35,29 @@ impl IntoResponse for ErrorBody {
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         let (status, error_msg) = match self {
-            ApiError::DatabaseError(a) => (
+            Self::DatabaseError(a) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Something went wrong in the server. {a}"),
             ),
-            ApiError::IncorrectPassword(_) => (
+            Self::IncorrectPassword(_) => {
+                (StatusCode::BAD_REQUEST, "Incorrct passsword".to_string())
+            }
+            Self::NotSuperuser => (
                 StatusCode::BAD_REQUEST,
-                "Incorrct passsword".to_string()
+                "User is not a superuser.".to_string(),
             ),
-            ApiError::NotSuperuser => (
+            Self::ImageError(_) => (
                 StatusCode::BAD_REQUEST,
-                "User is not a superuser.".to_string()
+                "Error has been occured while parsing the image.".to_string(),
             ),
-            ApiError::ImageError(_) => (
+            Self::SelectionError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error has been occurred while selecting the product for the user.".to_string(),
+            ),
+            Self::InsufficientPoints => (
                 StatusCode::BAD_REQUEST,
-                "Error has been occured while parsing the image.".to_string()
-            )
+                "User has insufficient points.".to_string(),
+            ),
         };
 
         let body = ErrorBody {
@@ -58,4 +68,3 @@ impl IntoResponse for ApiError {
         (status, body).into_response()
     }
 }
-

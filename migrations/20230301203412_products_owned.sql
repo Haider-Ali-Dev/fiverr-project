@@ -3,7 +3,8 @@
 CREATE TABLE products_owned(
     bought_at timestamp NOT NULL,
     id uuid PRIMARY KEY NOT NULL,
-    CONSTRAINT product_id FOREIGN KEY(id) REFERENCES products(id),
-    CONSTRAINT user_id FOREIGN KEY(id) REFERENCES users(id)
-
+    product_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    CONSTRAINT fk_product_id FOREIGN KEY (product_id) REFERENCES products(id),
+    CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id)
 );

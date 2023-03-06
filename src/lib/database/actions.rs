@@ -1,10 +1,12 @@
-use std::sync::Arc;
-
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, Product, ResponseUser, User},
+    models::{Amount, Box, Listing, Product, ProductIdent, ResponseUser, User},
     web::{ImageData, ReqId, SignIn},
 };
+use chrono::Utc;
+use futures::TryFutureExt;
+use rand::Rng;
+use std::sync::Arc;
 use uuid::Uuid;
 pub type Pool = sqlx::Pool<sqlx::postgres::Postgres>;
 use crate::database::models::{
@@ -167,6 +169,7 @@ impl DatabaseHand {
 
         for pro in products {
             let product: Product = pro.into();
+
             final_products.push(product);
         }
 
@@ -229,17 +232,18 @@ impl DatabaseHand {
                 for prod in prods {
                     sqlx::query!(
                         "INSERT INTO products
-                    (box_id, title, id, description, level, status, created_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                    // Remember that prod.box_id is a temporary id so we have 
-                    // to use `bx.id`
+                    (box_id, title, id, description, level, status, created_at, amount)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                        // Remember that prod.box_id is a temporary id so we have
+                        // to use `bx.id`
                         bx.id,
                         prod.title,
                         prod.id,
                         prod.description,
                         prod.level as i32,
                         prod.status,
-                        prod.created_at
+                        prod.created_at,
+                        prod.amount
                     )
                     .execute(&pool)
                     .await?;
@@ -320,5 +324,110 @@ impl DatabaseHand {
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
         }
+    }
+
+    pub async fn get_box_cost(pool: &Pool, box_id: &Uuid) -> DResult<i32> {
+        let pool = pool.clone();
+        let cost = sqlx::query!("SELECT price FROM box WHERE id = $1", box_id)
+            .fetch_one(&pool)
+            .await?;
+        Ok(cost.price)
+    }
+
+    pub async fn deduct_points_from_user(pool: &Pool, data: (u32, Uuid)) -> DResult<()> {
+        let (points, user_id) = data;
+        let user_points = DatabaseHand::get_user_points(&pool, &user_id).await?;
+        let p = user_points - points;
+        let pool = pool.clone();
+        sqlx::query!(
+            "UPDATE users SET points = $1 WHERE id = $2",
+            p as i32,
+            user_id
+        )
+        .execute(&pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_single_product(pool: &Pool, product_id: &Uuid) -> DResult<Product> {
+        let pool = pool.clone();
+        let product = sqlx::query_as!(DProduct, "SELECT * FROM products WHERE id = $1", product_id)
+            .fetch_one(&pool)
+            .await?
+            .into();
+        Ok(product)
+    }
+    pub async fn buy_box(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Product> {
+        let (box_id, req_id) = data;
+        let pool = pool.clone();
+        let points = DatabaseHand::get_user_points(&pool, &req_id.id).await?;
+        let cost = DatabaseHand::get_box_cost(&pool, &box_id).await?;
+
+        // Checking if user has enough points
+        if points == 0 {
+            return Err(ApiError::InsufficientPoints);
+        } else {
+            if points < cost as u32 {
+                return Err(ApiError::InsufficientPoints);
+            }
+        }
+
+        // Deducting points from user
+        DatabaseHand::deduct_points_from_user(&pool, (cost as u32, req_id.id)).await?;
+
+        // Selecting a random product
+        let mut products_idents = Vec::new();
+        let products = DatabaseHand::get_products(&pool, &box_id)
+            .await?
+            .into_iter()
+            .filter(|prod| prod.status == false)
+            .collect::<Vec<Product>>();
+
+        for product in &products {
+            let product: ProductIdent = product.clone().into();
+            products_idents.push(product);
+        }
+
+        let prod = DatabaseHand::select_weighted_random_product(&products_idents);
+        match prod {
+            Some(prod) => {
+                // Setting the status to true
+                sqlx::query!("UPDATE products SET status = true WHERE id = $1", &prod.id)
+                    .execute(&pool)
+                    .await?;
+
+                // Adding the product purchase to products_owned
+                let t = Utc::now().naive_utc();
+                sqlx::query!(
+                    "INSERT INTO products_owned(user_id, product_id, bought_at, id) 
+                VALUES($1, $2, $3, $4)",
+                    &req_id.id,
+                    &prod.id,
+                    t,
+                    Uuid::new_v4()
+                )
+                .execute(&pool)
+                .await?;
+
+                // Getting the product
+                let product = DatabaseHand::get_single_product(&pool, &prod.id).await?;
+                Ok(product)
+            }
+            None => Err(ApiError::SelectionError),
+        }
+    }
+
+    fn select_weighted_random_product(products: &Vec<ProductIdent>) -> Option<ProductIdent> {
+        let total_sum = products.iter().map(|p| p.total).sum();
+        let mut rng = rand::thread_rng();
+        let random_number = rng.gen_range(0..total_sum);
+        let mut running_total = 0;
+        for product in products {
+            running_total += product.total;
+            if running_total >= random_number {
+                return Some(product.clone());
+            }
+        }
+        None
     }
 }

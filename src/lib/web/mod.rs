@@ -7,6 +7,7 @@ use crate::{
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::Value;
 use uuid::Uuid;
 
 pub mod routes;
@@ -44,11 +45,14 @@ pub struct ProductData {
     pub title: String,
     pub description: String,
     pub level: u32,
+    pub amount: i32,
 }
 
 impl From<ProductData> for Product {
     fn from(p: ProductData) -> Self {
         Self {
+            available: p.amount,
+            amount: p.amount,
             id: Uuid::new_v4(),
             // Temporary Id
             box_id: Uuid::new_v4(),

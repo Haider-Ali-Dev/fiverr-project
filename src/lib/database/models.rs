@@ -36,6 +36,7 @@ pub struct Product {
     pub level: i32,
     pub status: bool,
     pub created_at: NaiveDateTime,
+    pub amount: i32,
 }
 
 
@@ -64,6 +65,8 @@ impl From<Product> for models::Product {
             level: value.level as u32,
             status: value.status,
             created_at: value.created_at,
+            amount: value.amount,
+            available: value.amount
         }
     }
 }

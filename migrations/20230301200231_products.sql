@@ -7,7 +7,7 @@ CREATE TABLE products (
     description text NOT NULL,
     level int NOT NULL,
     status boolean NOT NULL,
-    created_at timestamp NOT NULL
-
+    created_at timestamp NOT NULL,
+    amount int NOT NULL
 
 );
