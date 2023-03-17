@@ -83,16 +83,18 @@ impl DatabaseHand {
     // Get all user's owned product's ids from owned_products table
     pub async fn get_owned_products(pool: &Pool, id: &Uuid) -> DResult<Vec<Uuid>> {
         let pool = pool.clone();
-        let owned_products = sqlx::query!("SELECT product_id FROM products_owned WHERE user_id = $1", id)
-            .fetch_all(&pool)
-            .await?;
+        let owned_products = sqlx::query!(
+            "SELECT product_id FROM products_owned WHERE user_id = $1",
+            id
+        )
+        .fetch_all(&pool)
+        .await?;
         let mut owned_products_ids: Vec<Uuid> = vec![];
         for product in owned_products {
             owned_products_ids.push(product.product_id);
         }
         Ok(owned_products_ids)
     }
-
 
     pub async fn get_users(pool: &Pool) -> DResult<Vec<ResponseUser>> {
         let pool = pool.clone();
@@ -112,9 +114,6 @@ impl DatabaseHand {
         }
         Ok(final_users)
     }
-
-    
-    
 
     pub async fn get_user_email(pool: &Pool, email: &str) -> DResult<ResponseUser> {
         let pool = pool.clone();
@@ -389,11 +388,8 @@ impl DatabaseHand {
         }
     }
 
-    // delete_single_product and return the listing
-    pub async fn delete_single_product(
-        pool: &Pool,
-        data: (Uuid, ReqId),
-    ) -> DResult<Listing> {
+    // delete_single_product and return all the listings
+    pub async fn delete_product(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Vec<Listing>> {
         let (product_id, req_id) = data;
         let pool = pool.clone();
         match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
@@ -401,20 +397,20 @@ impl DatabaseHand {
                 let box_id = sqlx::query!("SELECT box_id FROM products WHERE id = $1", product_id)
                     .fetch_one(&pool)
                     .await?;
-                let listing_id = sqlx::query!("SELECT listing_id FROM box WHERE id = $1", box_id.box_id)
-                    .fetch_one(&pool)
-                    .await?;
                 sqlx::query!("DELETE FROM products WHERE id = $1", product_id)
                     .execute(&pool)
                     .await?;
-                let listing = DatabaseHand::get_single_listing(&pool, &listing_id.listing_id).await?;
-                Ok(listing)
+                let listing_id =
+                    sqlx::query!("SELECT listing_id FROM box WHERE id = $1", box_id.box_id)
+                        .fetch_one(&pool)
+                        .await?;
+                let listings = DatabaseHand::get_listing(&pool).await?;
+                Ok(listings)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
         }
     }
 
-   
     pub async fn get_box_cost(pool: &Pool, box_id: &Uuid) -> DResult<i32> {
         let pool = pool.clone();
         let cost = sqlx::query!("SELECT price FROM box WHERE id = $1", box_id)
@@ -437,7 +433,34 @@ impl DatabaseHand {
         .await?;
         Ok(())
     }
+    // Confirm user privilege also
+    pub async fn add_product_to_box(pool: &Pool, data: (ReqId, Uuid, Product)) -> DResult<Vec<Listing>> {
+        let (req_id, box_id, product) = data;
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
+            Ok(true) => {
+                sqlx::query!(
+                    "INSERT INTO products
+                (box_id, title, id, description, level, status, created_at, amount)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    box_id,
+                    product.title,
+                    product.id,
+                    product.description,
+                    product.level as i32,
+                    product.status,
+                    product.created_at,
+                    product.amount
+                )
+                .execute(&pool)
+                .await?;
+                let listing = DatabaseHand::get_listing(&pool).await?;
 
+                Ok(listing)
+            }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
+    }
     pub async fn get_single_product(pool: &Pool, product_id: &Uuid) -> DResult<Product> {
         let pool = pool.clone();
         let product = sqlx::query_as!(DProduct, "SELECT * FROM products WHERE id = $1", product_id)

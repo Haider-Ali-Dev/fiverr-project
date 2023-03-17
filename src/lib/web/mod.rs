@@ -13,6 +13,21 @@ use uuid::Uuid;
 pub mod routes;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IdAndReqId {
+    pub id: String,
+    pub req_id: ReqIdStr,
+}
+
+impl From<IdAndReqId> for (Uuid, ReqId) {
+    fn from(value: IdAndReqId) -> Self {
+        (
+            Uuid::from_str(&value.id).unwrap(),
+            value.req_id.into()
+        )
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Register {
     pub email: String,
     pub password: String,
@@ -79,6 +94,25 @@ impl From<ProductData> for Product {
         }
     }
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProductCreation {
+    pub req_id: ReqIdStr,
+    pub product_data: ProductData,
+    pub box_id: String
+}
+
+impl From<ProductCreation> for (Product, ReqId, Uuid) {
+    fn from(data: ProductCreation) -> Self {
+        let prod: Product = data.product_data.into();
+        (
+            prod,
+            data.req_id.into(),
+            Uuid::from_str(&data.box_id).unwrap()
+        )
+    }
+}
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BoxData {

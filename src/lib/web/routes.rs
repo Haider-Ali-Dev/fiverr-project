@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     database::actions::DatabaseHand,
     error::ApiError,
-    models::{self, Listing, ResponseUser, ServerStatus, User},
+    models::{self, Listing, Product, ResponseUser, ServerStatus, User},
     web::{ImageData, ReqId},
     State,
 };
@@ -24,7 +24,9 @@ use futures::{Stream, TryStreamExt};
 
 use tokio_util::io::StreamReader;
 
-use super::{BoxCreation, DeleteListing, Register, ReqListing, SignIn};
+use super::{
+    BoxCreation, DeleteListing, IdAndReqId, ProductCreation, Register, ReqListing, SignIn,
+};
 
 pub async fn register_user(
     Extension(data): Extension<Arc<State>>,
@@ -174,10 +176,31 @@ pub async fn delete_listing(
     Ok(Json(listings))
 }
 
+pub async fn delete_single_product(
+    Extension(data): Extension<Arc<State>>,
+    product_data: Json<IdAndReqId>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let products = DatabaseHand::delete_product(&pool, product_data.0.clone().into()).await?;
+    Ok(Json(products))
+}
+
 pub async fn send_server_status() -> Result<Json<ServerStatus>, ApiError> {
     let status = ServerStatus {
         status: true,
         message: "Server is up and running".to_string(),
     };
     Ok(Json(status))
+}
+
+pub async fn add_product_to_box(
+    Extension(data): Extension<Arc<State>>,
+    product_data: Json<ProductCreation>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let product_data: (Product, ReqId, Uuid) = product_data.0.into();
+    let listing =
+        DatabaseHand::add_product_to_box(&pool, (product_data.1, product_data.2, product_data.0))
+            .await?;
+    Ok(Json(listing))
 }
