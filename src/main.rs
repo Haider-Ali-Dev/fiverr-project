@@ -2,10 +2,16 @@ use std::sync::Arc;
 
 use api::{
     database::Database,
-    web::routes::{register_user, sign_in_user, create_listing, create_box},
+    web::routes::{create_box, create_listing, register_user, sign_in_user, auth, get_all_users, get_listings, delete_listing, send_server_status},
     State,
 };
-use axum::{routing::post, Extension, Router, Server};
+use axum::{
+    http::{header::CONTENT_TYPE, Method},
+    routing::{post, get},
+    Extension, Router, Server,
+};
+use tower_cookies::CookieManagerLayer;
+use tower_http::cors::{CorsLayer, Origin};
 
 #[tokio::main]
 async fn main() {
@@ -16,10 +22,26 @@ async fn main() {
         .route("/auth/signin", post(sign_in_user))
         .route("/admin/create/listing", post(create_listing))
         .route("/admin/create/box", post(create_box))
-        .layer(Extension(Arc::new(state)));
+        .route("/auth/verify", get(auth))
+        .route("/get/users", get(get_all_users))
+        .route("/get/listings", get(get_listings))
+        .route("/admin/delete/listing", post(delete_listing))
+        .route("/admin/server_status", get(send_server_status))
+        .layer(Extension(Arc::new(state)))
+        .layer(CookieManagerLayer::new())
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Origin::exact("http://localhost:4200".parse().unwrap()))
+                .allow_methods(vec![Method::GET, Method::POST])
+                .allow_credentials(true)
+                .allow_headers(vec![CONTENT_TYPE]),
+        );
 
-    Server::bind(&"0.0.0.0:3200".parse().unwrap())
+    match Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(router.into_make_service())
         .await
-        .unwrap();
+    {
+        Ok(_) => println!("Server started"),
+        Err(e) => println!("Server error: {}", e),
+    }
 }

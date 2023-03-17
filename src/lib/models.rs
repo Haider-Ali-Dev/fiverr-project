@@ -12,6 +12,11 @@ pub struct Box {
     pub total: u32,
     pub available_products: u32,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServerStatus {
+    pub status: bool,
+    pub message: String,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Level {
@@ -88,6 +93,7 @@ pub struct User {
     pub owned_products: Vec<Product>,
     pub points: u32,
     pub is_superuser: bool,
+    pub private_key: Uuid
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,7 +103,7 @@ pub struct ResponseUser {
     pub email: String,
     pub id: Uuid,
     pub created_at: NaiveDateTime,
-    pub owned_products: Vec<Product>,
+    pub owned_products: Vec<Uuid>,
     pub points: u32,
 }
 
@@ -115,7 +121,7 @@ impl From<User> for ResponseUser {
             email: value.email,
             id: value.id,
             created_at: value.created_at,
-            owned_products: value.owned_products,
+            owned_products: vec![],
             points: value.points,
         }
     }

@@ -7,6 +7,7 @@ use chrono::Utc;
 use futures::TryFutureExt;
 use rand::Rng;
 use std::sync::Arc;
+use tower_cookies::Cookies;
 use uuid::Uuid;
 pub type Pool = sqlx::Pool<sqlx::postgres::Postgres>;
 use crate::database::models::{
@@ -20,23 +21,48 @@ pub struct DatabaseHand;
 type DResult<T> = Result<T, ApiError>;
 
 impl DatabaseHand {
+    pub async fn get_user_from_private_key(
+        pool: &Pool,
+        private_key: &Uuid,
+    ) -> DResult<ResponseUser> {
+        let pool = pool.clone();
+        let user = sqlx::query_as!(
+            DBUser,
+            "SELECT username, email, id, created_at, points, is_superuser  FROM users WHERE private_key = $1",
+            private_key
+        )
+        .fetch_one(&pool)
+        .await?;
+        Ok(user.into())
+    }
     pub async fn create_user(pool: &Pool, user: &User) -> DResult<ResponseUser> {
         let pool = pool.clone();
         let user = user.clone();
         sqlx::query!(
-            "INSERT INTO users(username, email, password, id, created_at, points, is_superuser)
-        VALUES($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO users(username, email, password, id, created_at, points, is_superuser, private_key)
+        VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
             user.username,
             user.email,
             user.password,
             user.id,
             user.created_at,
             user.points as i32,
-            user.is_superuser
+            user.is_superuser,
+            user.private_key
         )
         .execute(&pool)
         .await?;
         Ok(user.into())
+    }
+
+    pub async fn get_private_key(pool: &Pool, id: &Uuid) -> DResult<Uuid> {
+        let pool = pool.clone();
+        let private_key = sqlx::query!("SELECT private_key FROM users WHERE id = $1", id)
+            .fetch_one(&pool)
+            .await?
+            .private_key;
+
+        Ok(private_key)
     }
 
     pub async fn sign_in(pool: &Pool, signin: &SignIn) -> DResult<ResponseUser> {
@@ -53,6 +79,42 @@ impl DatabaseHand {
             )),
         }
     }
+
+    // Get all user's owned product's ids from owned_products table
+    pub async fn get_owned_products(pool: &Pool, id: &Uuid) -> DResult<Vec<Uuid>> {
+        let pool = pool.clone();
+        let owned_products = sqlx::query!("SELECT product_id FROM products_owned WHERE user_id = $1", id)
+            .fetch_all(&pool)
+            .await?;
+        let mut owned_products_ids: Vec<Uuid> = vec![];
+        for product in owned_products {
+            owned_products_ids.push(product.product_id);
+        }
+        Ok(owned_products_ids)
+    }
+
+
+    pub async fn get_users(pool: &Pool) -> DResult<Vec<ResponseUser>> {
+        let pool = pool.clone();
+        let users = sqlx::query_as!(
+            DBUser,
+            "SELECT username, email, id, created_at, points, is_superuser from users"
+        )
+        .fetch_all(&pool)
+        .await?;
+        let mut final_users: Vec<ResponseUser> = vec![];
+        for user in users {
+            let points = DatabaseHand::get_user_points(&pool, &user.id).await?;
+            let mut user: ResponseUser = user.into();
+            user.points = points;
+            user.owned_products = DatabaseHand::get_owned_products(&pool, &user.id).await?;
+            final_users.push(user);
+        }
+        Ok(final_users)
+    }
+
+    
+    
 
     pub async fn get_user_email(pool: &Pool, email: &str) -> DResult<ResponseUser> {
         let pool = pool.clone();
@@ -307,13 +369,14 @@ impl DatabaseHand {
                 let box_ids = sqlx::query!("SELECT id FROM box WHERE listing_id = $1", listing_id)
                     .fetch_all(&pool)
                     .await?;
-                sqlx::query!("DELETE FROM box WHERE listing_id = $1", listing_id)
-                    .execute(&pool)
-                    .await?;
+                // sqlx::query!("DELETE FROM listi WHERE listing_id = $1", listing_id)
+                //     .execute(&pool)
+                //     .await?;
                 for box_id in box_ids {
-                    sqlx::query!("DELETE FROM products WHERE box_id = $1", box_id.id)
-                        .execute(&pool)
-                        .await?;
+                    DatabaseHand::delete_box(&pool, (box_id.id, req_id.clone())).await?;
+                    // sqlx::query!("DELETE FROM products WHERE box_id = $1", box_id.id)
+                    //     .execute(&pool)
+                    //     .await?;
                 }
 
                 sqlx::query!("DELETE FROM listing WHERE id = $1 ", listing_id)
@@ -326,6 +389,32 @@ impl DatabaseHand {
         }
     }
 
+    // delete_single_product and return the listing
+    pub async fn delete_single_product(
+        pool: &Pool,
+        data: (Uuid, ReqId),
+    ) -> DResult<Listing> {
+        let (product_id, req_id) = data;
+        let pool = pool.clone();
+        match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
+            Ok(true) => {
+                let box_id = sqlx::query!("SELECT box_id FROM products WHERE id = $1", product_id)
+                    .fetch_one(&pool)
+                    .await?;
+                let listing_id = sqlx::query!("SELECT listing_id FROM box WHERE id = $1", box_id.box_id)
+                    .fetch_one(&pool)
+                    .await?;
+                sqlx::query!("DELETE FROM products WHERE id = $1", product_id)
+                    .execute(&pool)
+                    .await?;
+                let listing = DatabaseHand::get_single_listing(&pool, &listing_id.listing_id).await?;
+                Ok(listing)
+            }
+            Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
+        }
+    }
+
+   
     pub async fn get_box_cost(pool: &Pool, box_id: &Uuid) -> DResult<i32> {
         let pool = pool.clone();
         let cost = sqlx::query!("SELECT price FROM box WHERE id = $1", box_id)

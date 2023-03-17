@@ -18,6 +18,8 @@ pub enum ApiError {
     SelectionError,
     #[error("User has insufficient points.")]
     InsufficientPoints,
+    #[error("User has no session cookie.")]
+    NoSessionCookieFound
 }
 
 #[derive(Serialize)]
@@ -57,6 +59,10 @@ impl IntoResponse for ApiError {
             Self::InsufficientPoints => (
                 StatusCode::BAD_REQUEST,
                 "User has insufficient points.".to_string(),
+            ),
+            Self::NoSessionCookieFound => (
+                StatusCode::BAD_REQUEST,
+                "User has no session cookie.".to_string(),
             ),
         };
 

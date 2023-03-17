@@ -35,6 +35,21 @@ pub struct ReqIdStr {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DeleteListing {
+    pub listing_id: String,
+    pub req_id: ReqIdStr
+}
+
+
+impl From<DeleteListing> for (Uuid, ReqId) {
+    fn from(value: DeleteListing) -> Self {
+        (
+            Uuid::from_str(&value.listing_id).unwrap(),
+            value.req_id.into()
+        )
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReqListing {
     pub req_id: String,
     pub image: String,
@@ -137,6 +152,7 @@ impl TryFrom<Register> for User {
         let hash_pass = hash(user.password, DEFAULT_COST)?;
         let created_at = Utc::now().naive_utc();
         Ok(Self {
+            private_key: Uuid::new_v4(),
             username: user.username,
             email: user.email,
             id: Uuid::new_v4(),

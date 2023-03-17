@@ -1,11 +1,17 @@
-use std::{io, sync::Arc};
+use std::{io, str::FromStr, sync::Arc};
 
-use axum::{extract::Multipart, http::StatusCode, Extension, Json};
+use axum::{
+    extract::Multipart,
+    http::{header::COOKIE, HeaderMap, StatusCode},
+    Extension, Json,
+};
+use tower_cookies::{Cookie, Cookies};
+use uuid::Uuid;
 
 use crate::{
     database::actions::DatabaseHand,
     error::ApiError,
-    models::{self, Listing, ResponseUser, User},
+    models::{self, Listing, ResponseUser, ServerStatus, User},
     web::{ImageData, ReqId},
     State,
 };
@@ -18,26 +24,68 @@ use futures::{Stream, TryStreamExt};
 
 use tokio_util::io::StreamReader;
 
-use super::{BoxCreation, Register, ReqListing, SignIn};
+use super::{BoxCreation, DeleteListing, Register, ReqListing, SignIn};
 
 pub async fn register_user(
     Extension(data): Extension<Arc<State>>,
     user: Json<Register>,
+    cookies: Cookies,
 ) -> Result<Json<ResponseUser>, ApiError> {
     let pool = data.database.pool.clone();
     let user_data: User = user.0.clone().try_into()?;
     let response = DatabaseHand::create_user(&pool, &user_data).await?;
+    let private_key = DatabaseHand::get_private_key(&pool, &user_data.id)
+        .await?
+        .to_string();
+    cookies.add(Cookie::new("session_id", private_key));
     Ok(Json(response))
 }
 
 pub async fn sign_in_user(
     Extension(data): Extension<Arc<State>>,
     user: Json<SignIn>,
+    cookies: Cookies,
 ) -> Result<Json<ResponseUser>, ApiError> {
     let pool = data.database.pool.clone();
     let user_data = user.0.clone();
     let response = DatabaseHand::sign_in(&pool, &user_data).await?;
+    let private_key = DatabaseHand::get_private_key(&pool, &response.id)
+        .await?
+        .to_string();
+    cookies.add(Cookie::new("session_id", private_key));
     Ok(Json(response))
+}
+pub async fn get_all_users(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<ResponseUser>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let users = DatabaseHand::get_users(&pool).await?;
+    Ok(Json(users))
+}
+pub async fn auth(
+    Extension(data): Extension<Arc<State>>,
+    headers: HeaderMap,
+) -> Result<Json<ResponseUser>, ApiError> {
+    let pool = data.database.pool.clone();
+    match headers.get(COOKIE) {
+        Some(data) => {
+            let cookie = data.to_str().unwrap().split('=').collect::<Vec<_>>()[1];
+            let key: String = cookie.to_string();
+            let user =
+                DatabaseHand::get_user_from_private_key(&pool, &Uuid::from_str(&key).unwrap())
+                    .await?;
+            Ok(Json(user))
+        }
+        None => Err(ApiError::NoSessionCookieFound),
+    }
+}
+
+pub async fn get_listings(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let listings = DatabaseHand::get_listing(&pool).await?;
+    Ok(Json(listings))
 }
 
 pub async fn create_listing(
@@ -115,4 +163,21 @@ pub async fn create_box(
     let box_data = box_data.0.into();
     let bx = DatabaseHand::create_box(&pool, box_data).await?;
     Ok(Json(bx))
+}
+
+pub async fn delete_listing(
+    Extension(data): Extension<Arc<State>>,
+    listing_data: Json<DeleteListing>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let listings = DatabaseHand::delete_listing(&pool, listing_data.0.clone().into()).await?;
+    Ok(Json(listings))
+}
+
+pub async fn send_server_status() -> Result<Json<ServerStatus>, ApiError> {
+    let status = ServerStatus {
+        status: true,
+        message: "Server is up and running".to_string(),
+    };
+    Ok(Json(status))
 }
