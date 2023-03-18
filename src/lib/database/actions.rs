@@ -1,6 +1,6 @@
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, Product, ProductIdent, ResponseUser, User},
+    models::{Amount, Box, Listing, LogData, Product, ProductIdent, ResponseUser, User},
     web::{ImageData, ReqId, SignIn},
 };
 use chrono::Utc;
@@ -355,6 +355,15 @@ impl DatabaseHand {
                     .await?;
 
                 let listing = DatabaseHand::get_single_listing(&pool, &id.listing_id).await?;
+                DatabaseHand::add_log(
+                    &pool,
+                    LogData {
+                        user_id: data.clone().1,
+                        id: Uuid::new_v4(),
+                        created_at: Utc::now().naive_utc(),
+                        action: "Box deleted".to_owned(),
+                    },
+                ).await?;
                 Ok(listing)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
@@ -374,6 +383,7 @@ impl DatabaseHand {
                 //     .await?;
                 for box_id in box_ids {
                     DatabaseHand::delete_box(&pool, (box_id.id, req_id.clone())).await?;
+                    
                     // sqlx::query!("DELETE FROM products WHERE box_id = $1", box_id.id)
                     //     .execute(&pool)
                     //     .await?;
@@ -383,6 +393,15 @@ impl DatabaseHand {
                     .execute(&pool)
                     .await?;
                 let listings = DatabaseHand::get_listing(&pool).await?;
+                DatabaseHand::add_log(
+                    &pool,
+                    LogData {
+                        user_id: req_id.id.clone(),
+                        id: Uuid::new_v4(),
+                        created_at: Utc::now().naive_utc(),
+                        action: "Listing deleted".to_owned(),
+                    },
+                ).await?;
                 Ok(listings)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
@@ -406,8 +425,19 @@ impl DatabaseHand {
                         .fetch_one(&pool)
                         .await?;
                 let listings = DatabaseHand::get_listing(&pool).await?;
+                DatabaseHand::add_log(
+                    &pool,
+                    LogData {
+                        user_id: req_id.id.clone(),
+                        id: Uuid::new_v4(),
+                        created_at: Utc::now().naive_utc(),
+                        action: "Deleted Product".to_owned(),
+                    },
+                )
+                .await?;
                 Ok(listings)
             }
+
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
         }
     }
@@ -417,6 +447,7 @@ impl DatabaseHand {
         let cost = sqlx::query!("SELECT price FROM box WHERE id = $1", box_id)
             .fetch_one(&pool)
             .await?;
+
         Ok(cost.price)
     }
 
@@ -463,7 +494,16 @@ impl DatabaseHand {
                 }
 
                 let listing = DatabaseHand::get_listing(&pool).await?;
-
+                DatabaseHand::add_log(
+                    &pool,
+                    LogData {
+                        user_id: req_id.id.clone(),
+                        id: Uuid::new_v4(),
+                        created_at: Utc::now().naive_utc(),
+                        action: "Product Added to a box".to_owned(),
+                    },
+                )
+                .await?;
                 Ok(listing)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
@@ -554,9 +594,43 @@ impl DatabaseHand {
     pub async fn save_image(pool: &Pool, data: ImageData) -> DResult<String> {
         let pool = pool.clone();
         let ImageData { id, path } = data;
-        let image = sqlx::query!("INSERT INTO images(path, for_id) VALUES($1, $2) RETURNING path", path, id)
-            .fetch_one(&pool)
-            .await?;
+        let image = sqlx::query!(
+            "INSERT INTO images(path, for_id) VALUES($1, $2) RETURNING path",
+            path,
+            id
+        )
+        .fetch_one(&pool)
+        .await?;
+
         Ok(image.path.clone())
+    }
+
+    // Logging
+    pub async fn add_log(pool: &Pool, data: LogData) -> DResult<()> {
+        let pool = pool.clone();
+        let LogData {
+            user_id,
+            id,
+            created_at,
+            action,
+        } = data;
+        sqlx::query!(
+            "INSERT INTO logs(user_id, id, created_at, action) VALUES($1, $2, $3, $4)",
+            user_id,
+            id,
+            created_at,
+            action
+        )
+        .execute(&pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_logs(pool: &Pool) -> DResult<Vec<LogData>> {
+        let pool = pool.clone();
+        let logs = sqlx::query_as!(LogData, "SELECT * FROM logs")
+            .fetch_all(&pool)
+            .await?;
+        Ok(logs)
     }
 }

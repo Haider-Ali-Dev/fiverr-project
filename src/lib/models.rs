@@ -88,6 +88,14 @@ pub struct Product {
     pub image: String
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogData {
+    pub user_id: Uuid,
+    pub id: Uuid,
+    pub created_at: NaiveDateTime,
+    pub action: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
