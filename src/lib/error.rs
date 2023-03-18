@@ -19,7 +19,9 @@ pub enum ApiError {
     #[error("User has insufficient points.")]
     InsufficientPoints,
     #[error("User has no session cookie.")]
-    NoSessionCookieFound
+    NoSessionCookieFound,
+    #[error("Image not found.")]
+    ImageNotFound
 }
 
 #[derive(Serialize)]
@@ -64,6 +66,10 @@ impl IntoResponse for ApiError {
                 StatusCode::BAD_REQUEST,
                 "User has no session cookie.".to_string(),
             ),
+            Self::ImageNotFound => (
+                StatusCode::BAD_REQUEST,
+                "Image not found.".to_string(),
+            )
         };
 
         let body = ErrorBody {

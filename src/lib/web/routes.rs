@@ -1,17 +1,20 @@
 use std::{io, str::FromStr, sync::Arc};
 
 use axum::{
-    extract::Multipart,
+    body::StreamBody,
+    extract::{Multipart, Path},
     http::{header::COOKIE, HeaderMap, StatusCode},
-    Extension, Json,
+    response::IntoResponse,
+    Extension, Json, TypedHeader,
 };
+use headers::ContentType;
 use tower_cookies::{Cookie, Cookies};
 use uuid::Uuid;
 
 use crate::{
-    database::actions::DatabaseHand,
+    database::{actions::DatabaseHand, Database},
     error::ApiError,
-    models::{self, Listing, Product, ResponseUser, ServerStatus, User},
+    models::{self, ImageLink, Listing, Product, ResponseUser, ServerStatus, User},
     web::{ImageData, ReqId},
     State,
 };
@@ -22,7 +25,7 @@ use axum::body::Bytes;
 use axum::BoxError;
 use futures::{Stream, TryStreamExt};
 
-use tokio_util::io::StreamReader;
+use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{
     BoxCreation, DeleteListing, IdAndReqId, ProductCreation, Register, ReqListing, SignIn,
@@ -157,6 +160,38 @@ where
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
 }
 
+pub async fn generate_link(
+    Extension(data): Extension<Arc<State>>,
+    mut form: Multipart,
+) -> Result<Json<ImageLink>, ApiError> {
+    let id = uuid::Uuid::new_v4();
+
+    let img = ImageData {
+        path: String::new(),
+        id: id.clone(),
+    };
+
+    let mut file_name = String::from("database/images/");
+    while let Some(f) = form.next_field().await.unwrap() {
+        if let Some(name) = f.name() {
+            match name {
+                "file" => match f.content_type() {
+                    Some("image/png") => {
+                        file_name.push_str(&id.to_string());
+                        stream_to_file(&format!("{id}.png"), f).await.unwrap();
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+        }
+    }
+    let img_clone = img.clone();
+    DatabaseHand::save_image(&data.database.pool.clone(), img).await?;
+    Ok(Json(ImageLink {
+        link: img_clone.id.to_string(),
+    }))
+}
 pub async fn create_box(
     Extension(data): Extension<Arc<State>>,
     box_data: Json<BoxCreation>,
@@ -198,9 +233,33 @@ pub async fn add_product_to_box(
     product_data: Json<ProductCreation>,
 ) -> Result<Json<Vec<Listing>>, ApiError> {
     let pool = data.database.pool.clone();
-    let product_data: (Product, ReqId, Uuid) = product_data.0.into();
+    let product_data: (Vec<Product>, ReqId, Uuid) = product_data.0.into();
     let listing =
         DatabaseHand::add_product_to_box(&pool, (product_data.1, product_data.2, product_data.0))
             .await?;
     Ok(Json(listing))
+}
+
+pub async fn delete_box(
+    Extension(data): Extension<Arc<State>>,
+    box_data: Json<IdAndReqId>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let _ = DatabaseHand::delete_box(&pool, box_data.0.clone().into()).await?;
+    Ok(Json(DatabaseHand::get_listing(&pool).await?))
+}
+pub async fn get_image(Path(id): Path<String>) -> Result<impl IntoResponse, ApiError> {
+    let (file, raw_path) = match tokio::fs::File::open(format!("database/images/{id}.png")).await {
+        Ok(file) => (file, format!("database/images/{id}.png")),
+        Err(_) => return Err(ApiError::ImageNotFound),
+    };
+    let stream = ReaderStream::new(file);
+    let body = StreamBody::new(stream);
+    match raw_path.split('.').collect::<Vec<_>>()[1] {
+        "png" => {
+            let he = TypedHeader(ContentType::from(mime::IMAGE_PNG));
+            return Ok((he, body));
+        }
+        _ => Err(ApiError::ImageNotFound),
+    }
 }

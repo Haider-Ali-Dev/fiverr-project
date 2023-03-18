@@ -76,6 +76,7 @@ pub struct ProductData {
     pub description: String,
     pub level: u32,
     pub amount: i32,
+    pub image: String
 }
 
 impl From<ProductData> for Product {
@@ -91,6 +92,7 @@ impl From<ProductData> for Product {
             level: p.level,
             status: false,
             created_at: Utc::now().naive_utc(),
+            image: p.image,
         }
     }
 }
@@ -98,15 +100,20 @@ impl From<ProductData> for Product {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProductCreation {
     pub req_id: ReqIdStr,
-    pub product_data: ProductData,
+    pub product_data: Vec<ProductData>,
     pub box_id: String
 }
 
-impl From<ProductCreation> for (Product, ReqId, Uuid) {
+impl From<ProductCreation> for (Vec<Product>, ReqId, Uuid) {
     fn from(data: ProductCreation) -> Self {
-        let prod: Product = data.product_data.into();
+        let mut p_vec = vec![];
+        for prod in &data.product_data {
+            let prod: Product = prod.clone().into();
+            p_vec.push(prod);
+        }
+
         (
-            prod,
+            p_vec,
             data.req_id.into(),
             Uuid::from_str(&data.box_id).unwrap()
         )

@@ -293,8 +293,8 @@ impl DatabaseHand {
                 for prod in prods {
                     sqlx::query!(
                         "INSERT INTO products
-                    (box_id, title, id, description, level, status, created_at, amount)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    (box_id, title, id, description, level, status, created_at, amount, image)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
                         // Remember that prod.box_id is a temporary id so we have
                         // to use `bx.id`
                         bx.id,
@@ -304,7 +304,8 @@ impl DatabaseHand {
                         prod.level as i32,
                         prod.status,
                         prod.created_at,
-                        prod.amount
+                        prod.amount,
+                        prod.image
                     )
                     .execute(&pool)
                     .await?;
@@ -434,26 +435,33 @@ impl DatabaseHand {
         Ok(())
     }
     // Confirm user privilege also
-    pub async fn add_product_to_box(pool: &Pool, data: (ReqId, Uuid, Product)) -> DResult<Vec<Listing>> {
-        let (req_id, box_id, product) = data;
+    pub async fn add_product_to_box(
+        pool: &Pool,
+        data: (ReqId, Uuid, Vec<Product>),
+    ) -> DResult<Vec<Listing>> {
+        let (req_id, box_id, products) = data;
         let pool = pool.clone();
         match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
             Ok(true) => {
-                sqlx::query!(
-                    "INSERT INTO products
-                (box_id, title, id, description, level, status, created_at, amount)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                    box_id,
-                    product.title,
-                    product.id,
-                    product.description,
-                    product.level as i32,
-                    product.status,
-                    product.created_at,
-                    product.amount
-                )
-                .execute(&pool)
-                .await?;
+                for product in products {
+                    sqlx::query!(
+                        "INSERT INTO products
+                (box_id, title, id, description, level, status, created_at, amount, image)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                        box_id,
+                        product.title,
+                        product.id,
+                        product.description,
+                        product.level as i32,
+                        product.status,
+                        product.created_at,
+                        product.amount,
+                        product.image
+                    )
+                    .execute(&pool)
+                    .await?;
+                }
+
                 let listing = DatabaseHand::get_listing(&pool).await?;
 
                 Ok(listing)
@@ -541,5 +549,14 @@ impl DatabaseHand {
             }
         }
         None
+    }
+
+    pub async fn save_image(pool: &Pool, data: ImageData) -> DResult<String> {
+        let pool = pool.clone();
+        let ImageData { id, path } = data;
+        let image = sqlx::query!("INSERT INTO images(path, for_id) VALUES($1, $2) RETURNING path", path, id)
+            .fetch_one(&pool)
+            .await?;
+        Ok(image.path.clone())
     }
 }

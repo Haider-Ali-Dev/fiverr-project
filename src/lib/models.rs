@@ -19,6 +19,10 @@ pub struct ServerStatus {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ImageLink {
+    pub link: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Level {
     ALevel,
     BLevel,
@@ -81,6 +85,7 @@ pub struct Product {
     pub created_at: NaiveDateTime,
     pub amount: i32,
     pub available: i32,
+    pub image: String
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

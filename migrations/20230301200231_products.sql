@@ -8,6 +8,7 @@ CREATE TABLE products (
     level int NOT NULL,
     status boolean NOT NULL,
     created_at timestamp NOT NULL,
-    amount int NOT NULL
+    amount int NOT NULL,
+    image text NOT NULL
 
 );

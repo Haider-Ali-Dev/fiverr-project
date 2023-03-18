@@ -13,6 +13,7 @@ bcrypt = "0.14.0"
 chrono = { version = "0.4.23", features = ["serde"] }
 futures = "0.3.26"
 headers = "0.3.8"
+mime = "0.3.16"
 rand = "0.8.5"
 serde = { version = "1.0.152", features = ["derive"] }
 

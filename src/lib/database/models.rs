@@ -37,6 +37,7 @@ pub struct Product {
     pub status: bool,
     pub created_at: NaiveDateTime,
     pub amount: i32,
+    pub image: String,
 }
 
 
@@ -66,7 +67,8 @@ impl From<Product> for models::Product {
             status: value.status,
             created_at: value.created_at,
             amount: value.amount,
-            available: value.amount
+            available: value.amount,
+            image: value.image
         }
     }
 }
