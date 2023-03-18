@@ -72,6 +72,7 @@ pub struct Listing {
     pub title: String,
     pub created_at: NaiveDateTime,
     pub box_count: u32,
+    pub tty: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

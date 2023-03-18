@@ -17,6 +17,7 @@ pub struct Listing {
     pub id: Uuid,
     pub title: String,
     pub created_at: NaiveDateTime,
+    pub tty: String
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +82,8 @@ impl From<Listing> for models::Listing {
             title: value.title,
             created_at: value.created_at,
             box_count: 0,
-            image: "".to_owned()
+            image: "".to_owned(),
+            tty: value.tty
         }
     }
 }

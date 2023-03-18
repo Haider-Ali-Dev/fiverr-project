@@ -69,6 +69,7 @@ pub struct ReqListing {
     pub req_id: String,
     pub image: String,
     pub title: String,
+    pub tty: String
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProductData {
@@ -176,6 +177,7 @@ impl From<ReqListing> for Listing {
             title: list.title,
             created_at: Utc::now().naive_utc(),
             box_count: 0,
+            tty: list.tty
         }
     }
 }

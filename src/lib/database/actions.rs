@@ -255,10 +255,11 @@ impl DatabaseHand {
         match DatabaseHand::confirm_user_privilege(&pool, &data.1).await {
             Ok(true) => {
                 sqlx::query!(
-                    "INSERT INTO listing (title, created_at, id) VALUES($1, $2, $3)",
+                    "INSERT INTO listing (title, created_at, id, tty) VALUES($1, $2, $3, $4)",
                     &data.0.title,
                     &data.0.created_at,
-                    &data.0.id
+                    &data.0.id,
+                    &data.0.tty
                 )
                 .execute(&pool)
                 .await?;
@@ -358,7 +359,7 @@ impl DatabaseHand {
                 DatabaseHand::add_log(
                     &pool,
                     LogData {
-                        user_id: data.clone().1,
+                        user_id: data.clone().1.id,
                         id: Uuid::new_v4(),
                         created_at: Utc::now().naive_utc(),
                         action: "Box deleted".to_owned(),

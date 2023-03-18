@@ -99,6 +99,7 @@ pub async fn create_listing(
 ) -> Result<Json<Vec<Listing>>, ApiError> {
     let pool = data.database.pool.clone();
     let mut req_list = ReqListing {
+        tty: String::new(),
         title: String::new(),
         image: String::new(),
         req_id: String::new(),
@@ -114,6 +115,10 @@ pub async fn create_listing(
                 "req_id" => {
                     let value = f.text().await?;
                     req_list.req_id = value;
+                }
+                "tty" => {
+                    let value = f.text().await?;
+                    req_list.tty = value;
                 }
                 "file" => match f.content_type() {
                     Some("image/png") => {
