@@ -200,11 +200,21 @@ pub async fn generate_link(
 pub async fn create_box(
     Extension(data): Extension<Arc<State>>,
     box_data: Json<BoxCreation>,
-) -> Result<Json<Vec<models::Box>>, ApiError> {
+) -> Result<Json<Vec<models::Listing>>, ApiError> {
     let pool = data.database.pool.clone();
     let box_data = box_data.0.into();
     let bx = DatabaseHand::create_box(&pool, box_data).await?;
-    Ok(Json(bx))
+    match DatabaseHand::check_listing_tty(&pool, &bx[0].listing_id).await?.as_str() {
+        "ICH" => {
+            let lis = DatabaseHand::get_listing_ich(&pool).await?;
+            Ok(Json(lis))
+        },
+        "HEX" => {
+            let lis = DatabaseHand::get_listing_hex(&pool).await?;
+            Ok(Json(lis))
+        }
+        _ => Err(ApiError::NotSuperuser)
+    }
 }
 
 pub async fn delete_listing(
@@ -223,6 +233,22 @@ pub async fn delete_single_product(
     let pool = data.database.pool.clone();
     let products = DatabaseHand::delete_product(&pool, product_data.0.clone().into()).await?;
     Ok(Json(products))
+}
+
+pub async fn get_listing_hex(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let listings = DatabaseHand::get_listing_hex(&pool).await?;
+    Ok(Json(listings))
+}
+
+pub async fn get_listing_ich(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let listings = DatabaseHand::get_listing_ich(&pool).await?;
+    Ok(Json(listings))
 }
 
 pub async fn send_server_status() -> Result<Json<ServerStatus>, ApiError> {

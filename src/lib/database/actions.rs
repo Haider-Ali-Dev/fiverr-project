@@ -6,6 +6,7 @@ use crate::{
 use chrono::Utc;
 use futures::TryFutureExt;
 use rand::Rng;
+use sqlx::pool;
 use std::sync::Arc;
 use tower_cookies::Cookies;
 use uuid::Uuid;
@@ -14,6 +15,8 @@ use crate::database::models::{
     Box as DBox, Listing as DListing, Product as DProduct, User as DBUser,
 };
 
+const BASE_URL: &str = "http://localhost:3000";
+
 /// This struct handles all the database queries.
 pub struct DatabaseHand;
 
@@ -21,6 +24,14 @@ pub struct DatabaseHand;
 type DResult<T> = Result<T, ApiError>;
 
 impl DatabaseHand {
+
+    pub async fn check_listing_tty(pool: &Pool, id: &Uuid) -> DResult<String> {
+        let pool = pool.clone();
+        let listing = sqlx::query!("SELECT tty FROM listing WHERE id = $1", id)
+            .fetch_one(&pool)
+            .await?;
+        Ok(listing.tty)
+    }
     pub async fn get_user_from_private_key(
         pool: &Pool,
         private_key: &Uuid,
@@ -183,6 +194,45 @@ impl DatabaseHand {
         let mut final_listings: Vec<Listing> = vec![];
         let pool = pool.clone();
         let listings = sqlx::query_as!(DListing, "SELECT * FROM listing")
+            .fetch_all(&pool)
+            .await?;
+        for listing in listings {
+            let mut listing: Listing = listing.into();
+            let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
+            let ed_img = listing_image.split('/').collect::<Vec<_>>();
+            listing.image = BASE_URL.to_owned() + "/get/image/" + ed_img.last().unwrap();
+            // listing.image = listing_image;
+            let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
+            listing.box_count = bxs.len() as u32;
+            listing.boxes = bxs;
+            final_listings.push(listing);
+        }
+        Ok(final_listings)
+    }
+
+    pub async fn get_listing_ich(pool: &Pool) -> DResult<Vec<Listing>> {
+        let mut final_listings: Vec<Listing> = vec![];
+        let pool = pool.clone();
+        let listings = sqlx::query_as!(DListing, "SELECT * FROM listing WHERE tty = 'ICH'")
+            .fetch_all(&pool)
+            .await?;
+        for listing in listings {
+            let mut listing: Listing = listing.into();
+            let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
+            let ed_img = listing_image.split('/').collect::<Vec<_>>();
+            listing.image = BASE_URL.to_owned() +"/get/image/" + ed_img.last().unwrap();
+            let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
+            listing.box_count = bxs.len() as u32;
+            listing.boxes = bxs;
+            final_listings.push(listing);
+        }
+        Ok(final_listings)
+    }
+
+    pub async fn get_listing_hex(pool: &Pool) -> DResult<Vec<Listing>> {
+        let mut final_listings: Vec<Listing> = vec![];
+        let pool = pool.clone();
+        let listings = sqlx::query_as!(DListing, "SELECT * FROM listing WHERE tty = 'HEX'")
             .fetch_all(&pool)
             .await?;
         for listing in listings {

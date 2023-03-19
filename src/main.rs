@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use api::{
     database::Database,
-    web::routes::{create_box, create_listing, get_image, register_user, sign_in_user, auth, get_all_users, get_listings, delete_listing, send_server_status, delete_single_product, add_product_to_box, delete_box, generate_link},
+    web::routes::{create_box, create_listing, get_image, register_user, sign_in_user, auth, get_all_users, get_listings, delete_listing, send_server_status, delete_single_product, add_product_to_box, delete_box, generate_link, get_listing_ich, get_listing_hex},
     State,
 };
 use axum::{
@@ -32,6 +32,9 @@ async fn main() {
         .route("/admin/delete/box", post(delete_box))
         .route("/get/image/:id", get(get_image))
         .route("/admin/generate/image_link", post(generate_link))
+        .route("/get/listings/ich", get(get_listing_ich))
+        .route("/get/listings/hex", get(get_listing_hex))
+
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
         .layer(
