@@ -13,6 +13,11 @@ use uuid::Uuid;
 pub mod routes;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Id {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct IdAndReqId {
     pub id: String,
     pub req_id: ReqIdStr,
@@ -204,6 +209,7 @@ impl TryFrom<Register> for User {
             owned_products: vec![],
             points: 0,
             is_superuser: false,
+            orders: vec![],
         })
     }
 }

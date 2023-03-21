@@ -1,6 +1,6 @@
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, LogData, Product, ProductIdent, ResponseUser, User},
+    models::{Amount, Box, Listing, LogData, Order, Product, ProductIdent, ResponseUser, User},
     web::{ImageData, ReqId, SignIn},
 };
 use chrono::Utc;
@@ -24,7 +24,6 @@ pub struct DatabaseHand;
 type DResult<T> = Result<T, ApiError>;
 
 impl DatabaseHand {
-
     pub async fn check_listing_tty(pool: &Pool, id: &Uuid) -> DResult<String> {
         let pool = pool.clone();
         let listing = sqlx::query!("SELECT tty FROM listing WHERE id = $1", id)
@@ -139,6 +138,8 @@ impl DatabaseHand {
 
         let points = DatabaseHand::get_user_points(&pool, &user.id).await?;
         user.points = points;
+        user.owned_products = DatabaseHand::get_owned_products(&pool, &user.id).await?;
+        user.orders = DatabaseHand::get_orders(&pool, &user.id).await?;
         Ok(user)
     }
     pub async fn get_user(pool: &Pool, id: Uuid) -> DResult<ResponseUser> {
@@ -154,6 +155,8 @@ impl DatabaseHand {
 
         let points = DatabaseHand::get_user_points(&pool, &user.id).await?;
         user.points = points;
+        user.orders = DatabaseHand::get_orders(&pool, &user.id).await?;
+        user.owned_products = DatabaseHand::get_owned_products(&pool, &user.id).await?;
         Ok(user)
     }
 
@@ -220,7 +223,7 @@ impl DatabaseHand {
             let mut listing: Listing = listing.into();
             let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
             let ed_img = listing_image.split('/').collect::<Vec<_>>();
-            listing.image = BASE_URL.to_owned() +"/get/image/" + ed_img.last().unwrap();
+            listing.image = BASE_URL.to_owned() + "/get/image/" + ed_img.last().unwrap();
             let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
             listing.box_count = bxs.len() as u32;
             listing.boxes = bxs;
@@ -414,7 +417,8 @@ impl DatabaseHand {
                         created_at: Utc::now().naive_utc(),
                         action: "Box deleted".to_owned(),
                     },
-                ).await?;
+                )
+                .await?;
                 Ok(listing)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
@@ -434,7 +438,7 @@ impl DatabaseHand {
                 //     .await?;
                 for box_id in box_ids {
                     DatabaseHand::delete_box(&pool, (box_id.id, req_id.clone())).await?;
-                    
+
                     // sqlx::query!("DELETE FROM products WHERE box_id = $1", box_id.id)
                     //     .execute(&pool)
                     //     .await?;
@@ -452,7 +456,8 @@ impl DatabaseHand {
                         created_at: Utc::now().naive_utc(),
                         action: "Listing deleted".to_owned(),
                     },
-                ).await?;
+                )
+                .await?;
                 Ok(listings)
             }
             Ok(false) | Err(_) => Err(ApiError::NotSuperuser),
@@ -620,8 +625,22 @@ impl DatabaseHand {
                 .execute(&pool)
                 .await?;
 
-                // Getting the product
+                sqlx::query!(
+                    "UPDATE products SET amount = amount - 1 WHERE id = $1",
+                    &prod.id
+                )
+                .execute(&pool)
+                .await?;
                 let product = DatabaseHand::get_single_product(&pool, &prod.id).await?;
+                let order = Order {
+                    id: Uuid::new_v4(),
+                    user_id: req_id.id,
+                    product_id: prod.id,
+                    created_at: t,
+                    status: "pPending".to_owned(),
+                };
+                DatabaseHand::add_order(order, &pool).await?;
+
                 Ok(product)
             }
             None => Err(ApiError::SelectionError),
@@ -683,5 +702,64 @@ impl DatabaseHand {
             .fetch_all(&pool)
             .await?;
         Ok(logs)
+    }
+
+    pub async fn get_listing_from_id(pool: &Pool, id: &Uuid) -> DResult<Listing> {
+        let pool = pool.clone();
+        let listing = sqlx::query_as!(DListing, "SELECT * FROM listing WHERE id = $1", id)
+            .fetch_one(&pool)
+            .await?;
+        let mut listing: Listing = listing.into();
+        let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
+        let ed_img = listing_image.split('/').collect::<Vec<_>>();
+        listing.image = BASE_URL.to_owned() + "/get/image/" + ed_img.last().unwrap();
+        let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
+        listing.box_count = bxs.len() as u32;
+        listing.boxes = bxs;
+        Ok(listing)
+    }
+
+    pub async fn add_order(order: Order, pool: &Pool) -> DResult<()> {
+        let pool = pool.clone();
+        let Order {
+            id,
+            user_id,
+            created_at,
+            status,
+            product_id,
+        } = order;
+        sqlx::query!(
+            "INSERT INTO order_tracking(id, user_id, product_id, created_at, status) VALUES($1, $2, $3, $4, $5)",
+            id,
+            user_id,
+            product_id,
+            created_at,
+            status,
+        )
+        .execute(&pool)
+        .await?;
+        Ok(())
+    }
+
+    // Get user's orders from user_id
+    pub async fn get_orders(pool: &Pool, user_id: &Uuid) -> DResult<Vec<Order>> {
+        let pool = pool.clone();
+        let orders = sqlx::query_as!(
+            Order,
+            "SELECT * FROM order_tracking WHERE user_id = $1",
+            user_id
+        )
+        .fetch_all(&pool)
+        .await?;
+        Ok(orders)
+    }
+
+    // Get all the orders
+    pub async fn get_all_orders(pool: &Pool) -> DResult<Vec<Order>> {
+        let pool = pool.clone();
+        let orders = sqlx::query_as!(Order, "SELECT * FROM order_tracking")
+            .fetch_all(&pool)
+            .await?;
+        Ok(orders)
     }
 }

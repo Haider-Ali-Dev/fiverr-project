@@ -9,6 +9,7 @@ use axum::{
 };
 use headers::ContentType;
 use tower_cookies::{Cookie, Cookies};
+use tungstenite::{Message, WebSocket};
 use uuid::Uuid;
 
 use crate::{
@@ -28,7 +29,7 @@ use futures::{Stream, TryStreamExt};
 use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{
-    BoxCreation, DeleteListing, IdAndReqId, ProductCreation, Register, ReqListing, SignIn,
+    BoxCreation, DeleteListing, Id, IdAndReqId, ProductCreation, Register, ReqListing, SignIn,
 };
 
 pub async fn register_user(
@@ -204,16 +205,19 @@ pub async fn create_box(
     let pool = data.database.pool.clone();
     let box_data = box_data.0.into();
     let bx = DatabaseHand::create_box(&pool, box_data).await?;
-    match DatabaseHand::check_listing_tty(&pool, &bx[0].listing_id).await?.as_str() {
+    match DatabaseHand::check_listing_tty(&pool, &bx[0].listing_id)
+        .await?
+        .as_str()
+    {
         "ICH" => {
             let lis = DatabaseHand::get_listing_ich(&pool).await?;
             Ok(Json(lis))
-        },
+        }
         "HEX" => {
             let lis = DatabaseHand::get_listing_hex(&pool).await?;
             Ok(Json(lis))
         }
-        _ => Err(ApiError::NotSuperuser)
+        _ => Err(ApiError::NotSuperuser),
     }
 }
 
@@ -294,3 +298,56 @@ pub async fn get_image(Path(id): Path<String>) -> Result<impl IntoResponse, ApiE
         _ => Err(ApiError::ImageNotFound),
     }
 }
+
+pub async fn get_listing_from_id(
+    Extension(data): Extension<Arc<State>>,
+    id: Json<Id>,
+) -> Result<Json<Listing>, ApiError> {
+    match Uuid::from_str(&id.0.id) {
+        Ok(i) => {
+            let pool = data.database.pool.clone();
+            let listing = DatabaseHand::get_listing_from_id(&pool, &i).await?;
+            Ok(Json(listing))
+        }
+        Err(_) => return Err(ApiError::InvalidId),
+    }
+}
+
+pub async fn buy_box(
+    Extension(data): Extension<Arc<State>>,
+    box_data: Json<IdAndReqId>,
+) -> Result<Json<Product>, ApiError> {
+    let pool = data.database.pool.clone();
+    Ok(Json(DatabaseHand::buy_box(&pool, box_data.0.clone().into()).await?))
+    
+}
+
+
+
+
+// Websocket route which shows realtime logs axum can be used to create websocket routes as well.
+// This route will be used to send logs to the client and make it compatible with the axum 
+// websocket route.
+
+// pub async fn ws_route(
+//     Extension(data): Extension<Arc<State>>,
+//     // The `ws` extractor extracts the `WebSocket` from the request.
+//     // import the `ws` extractor from `axum::extract::ws`
+//     ws: WebSocket,
+// ) -> Result<impl IntoResponse, ApiError> {
+//     let (mut sender, mut receiver) = ws.split();
+//     let mut stream = tokio::stream::StreamExt::fuse(tokio::stream::iter(vec![
+//         Ok(Message::text("Hello")),
+//         Ok(Message::text("World")),
+//     ]));
+//     while let Some(message) = stream.next().await {
+//         sender.send(message?).await?;
+//     }
+//     while let Some(message) = receiver.next().await {
+//         let message = message?;
+//         if message.is_close() {
+//             break;
+//         }
+//     }
+//     Ok("Hello")
+// }

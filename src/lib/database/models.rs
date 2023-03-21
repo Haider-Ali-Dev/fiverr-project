@@ -98,6 +98,7 @@ impl From<User> for models::ResponseUser {
             created_at: value.created_at,
             owned_products: vec![],
             points: value.points as u32,
+            orders: vec![],
         }
     }
 }

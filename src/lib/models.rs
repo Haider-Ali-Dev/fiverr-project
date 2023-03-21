@@ -89,6 +89,16 @@ pub struct Product {
     pub image: String
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Order {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub product_id: Uuid,
+    pub created_at: NaiveDateTime,
+    pub status: String,
+    
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogData {
@@ -107,7 +117,8 @@ pub struct User {
     pub owned_products: Vec<Product>,
     pub points: u32,
     pub is_superuser: bool,
-    pub private_key: Uuid
+    pub private_key: Uuid,
+    pub orders: Vec<Order>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,6 +130,7 @@ pub struct ResponseUser {
     pub created_at: NaiveDateTime,
     pub owned_products: Vec<Uuid>,
     pub points: u32,
+    pub orders: Vec<Order>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,6 +149,7 @@ impl From<User> for ResponseUser {
             created_at: value.created_at,
             owned_products: vec![],
             points: value.points,
+            orders: value.orders,
         }
     }
 }

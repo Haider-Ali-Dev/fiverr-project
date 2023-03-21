@@ -21,7 +21,9 @@ pub enum ApiError {
     #[error("User has no session cookie.")]
     NoSessionCookieFound,
     #[error("Image not found.")]
-    ImageNotFound
+    ImageNotFound,
+    #[error("Invalid id.")]
+    InvalidId
 }
 
 #[derive(Serialize)]
@@ -69,6 +71,10 @@ impl IntoResponse for ApiError {
             Self::ImageNotFound => (
                 StatusCode::BAD_REQUEST,
                 "Image not found.".to_string(),
+            ),
+            Self::InvalidId => (
+                StatusCode::BAD_REQUEST,
+                "Invalid id.".to_string(),
             )
         };
 

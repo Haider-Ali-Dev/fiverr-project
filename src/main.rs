@@ -2,12 +2,17 @@ use std::sync::Arc;
 
 use api::{
     database::Database,
-    web::routes::{create_box, create_listing, get_image, register_user, sign_in_user, auth, get_all_users, get_listings, delete_listing, send_server_status, delete_single_product, add_product_to_box, delete_box, generate_link, get_listing_ich, get_listing_hex},
+    web::routes::{
+        add_product_to_box, auth, create_box, create_listing, delete_box, delete_listing,
+        delete_single_product, generate_link, get_all_users, get_image, get_listing_from_id,
+        get_listing_hex, get_listing_ich, get_listings, register_user, send_server_status,
+        sign_in_user, buy_box
+    },
     State,
 };
 use axum::{
-    http::{header::CONTENT_TYPE, Method, },
-    routing::{post, get},
+    http::{header::CONTENT_TYPE, Method},
+    routing::{get, post},
     Extension, Router, Server,
 };
 use tower_cookies::CookieManagerLayer;
@@ -32,9 +37,10 @@ async fn main() {
         .route("/admin/delete/box", post(delete_box))
         .route("/get/image/:id", get(get_image))
         .route("/admin/generate/image_link", post(generate_link))
+        .route("/buy/box", post(buy_box))
         .route("/get/listings/ich", get(get_listing_ich))
         .route("/get/listings/hex", get(get_listing_hex))
-
+        .route("/get/listing", post(get_listing_from_id))
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
         .layer(
