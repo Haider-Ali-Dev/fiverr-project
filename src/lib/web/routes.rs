@@ -29,7 +29,8 @@ use futures::{Stream, TryStreamExt};
 use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{
-    BoxCreation, DeleteListing, Id, IdAndReqId, ProductCreation, Register, ReqListing, SignIn,
+    BoxCreation, DeleteListing, Id, IdAndReqId, IdReq, ProductCreation, Register, ReqListing,
+    SignIn, AddressDataReq,
 };
 
 pub async fn register_user(
@@ -313,20 +314,38 @@ pub async fn get_listing_from_id(
     }
 }
 
+pub async fn get_product(
+    Extension(data): Extension<Arc<State>>,
+    product_data: Json<IdReq>,
+) -> Result<Json<Product>, ApiError> {
+    let pool = data.database.pool.clone();
+    Ok(Json(
+        DatabaseHand::get_single_product(&pool, &Uuid::from_str(&product_data.id).unwrap()).await?,
+    ))
+}
+
 pub async fn buy_box(
     Extension(data): Extension<Arc<State>>,
     box_data: Json<IdAndReqId>,
 ) -> Result<Json<Product>, ApiError> {
     let pool = data.database.pool.clone();
-    Ok(Json(DatabaseHand::buy_box(&pool, box_data.0.clone().into()).await?))
-    
+    Ok(Json(
+        DatabaseHand::buy_box(&pool, box_data.0.clone().into()).await?,
+    ))
 }
 
-
-
+// update address
+pub async fn update_address(
+    Extension(data): Extension<Arc<State>>,
+    address_data: Json<AddressDataReq>,
+) -> Result<Json<ResponseUser>, ApiError> {
+    let pool = data.database.pool.clone();
+    let u = DatabaseHand::update_address(&pool, address_data.0.clone().into()).await?;
+    Ok(Json(u))
+}
 
 // Websocket route which shows realtime logs axum can be used to create websocket routes as well.
-// This route will be used to send logs to the client and make it compatible with the axum 
+// This route will be used to send logs to the client and make it compatible with the axum
 // websocket route.
 
 // pub async fn ws_route(

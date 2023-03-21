@@ -1,6 +1,6 @@
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, LogData, Order, Product, ProductIdent, ResponseUser, User},
+    models::{Amount, Box, Listing, LogData, Order, Product, ProductIdent, ResponseUser, User, AddressData},
     web::{ImageData, ReqId, SignIn},
 };
 use chrono::Utc;
@@ -38,12 +38,15 @@ impl DatabaseHand {
         let pool = pool.clone();
         let user = sqlx::query_as!(
             DBUser,
-            "SELECT username, email, id, created_at, points, is_superuser  FROM users WHERE private_key = $1",
+            "SELECT username, email, id, created_at, points, is_superuser, address  FROM users WHERE private_key = $1",
             private_key
         )
         .fetch_one(&pool)
         .await?;
-        Ok(user.into())
+        let mut user: ResponseUser = user.into();
+        user.orders = DatabaseHand::get_orders(&pool, &user.id).await?;
+        user.owned_products = DatabaseHand::get_owned_products(&pool, &user.id).await?;
+        Ok(user)
     }
     pub async fn create_user(pool: &Pool, user: &User) -> DResult<ResponseUser> {
         let pool = pool.clone();
@@ -110,7 +113,7 @@ impl DatabaseHand {
         let pool = pool.clone();
         let users = sqlx::query_as!(
             DBUser,
-            "SELECT username, email, id, created_at, points, is_superuser from users"
+            "SELECT username, email, id, created_at, points, is_superuser, address from users"
         )
         .fetch_all(&pool)
         .await?;
@@ -129,7 +132,7 @@ impl DatabaseHand {
         let pool = pool.clone();
         let mut user: ResponseUser = sqlx::query_as!(
             DBUser,
-            "SELECT username, email, id, created_at, points, is_superuser from users WHERE email = $1",
+            "SELECT username, email, id, created_at, points, is_superuser, address from users WHERE email = $1",
             email.clone()
         )
         .fetch_one(&pool)
@@ -146,7 +149,7 @@ impl DatabaseHand {
         let pool = pool.clone();
         let mut user: ResponseUser = sqlx::query_as!(
             DBUser,
-            "SELECT username, email, id, created_at, points, is_superuser from users WHERE id = $1",
+            "SELECT username, email, id, created_at, points, is_superuser, address from users WHERE id = $1",
             id.clone()
         )
         .fetch_one(&pool)
@@ -637,7 +640,7 @@ impl DatabaseHand {
                     user_id: req_id.id,
                     product_id: prod.id,
                     created_at: t,
-                    status: "pPending".to_owned(),
+                    status: "Pending".to_owned(),
                 };
                 DatabaseHand::add_order(order, &pool).await?;
 
@@ -762,4 +765,19 @@ impl DatabaseHand {
             .await?;
         Ok(orders)
     }
+
+    // Update address by user's id and return the user
+    pub async fn update_address(pool: &Pool, data: AddressData) -> DResult<ResponseUser> {
+        let pool = pool.clone();
+        let AddressData { address, user_id } = data;
+        sqlx::query!("UPDATE users SET address = $1 WHERE id = $2", address, user_id)
+            .execute(&pool)
+            .await?;
+        let user = DatabaseHand::get_user(&pool, user_id).await?;
+        Ok(user)
+        
+    }
+
+    // Get product from id 
+    
 }

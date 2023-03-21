@@ -119,6 +119,7 @@ pub struct User {
     pub is_superuser: bool,
     pub private_key: Uuid,
     pub orders: Vec<Order>,
+    pub address: Option<String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +132,7 @@ pub struct ResponseUser {
     pub owned_products: Vec<Uuid>,
     pub points: u32,
     pub orders: Vec<Order>,
+    pub address: Option<String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +152,7 @@ impl From<User> for ResponseUser {
             owned_products: vec![],
             points: value.points,
             orders: value.orders,
+            address: value.address
         }
     }
 }
@@ -196,4 +199,10 @@ impl From<u32> for Level {
             _ => Level::LastLevel,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddressData {
+    pub user_id: Uuid,
+    pub address: String,
 }

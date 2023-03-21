@@ -7,5 +7,6 @@ CREATE TABLE users (
     created_at timestamp NOT NULL,
     points int NOT NULL,
     is_superuser boolean NOT NULL,
-    private_key uuid NOT NULL
+    private_key uuid NOT NULL,
+    address text
 );

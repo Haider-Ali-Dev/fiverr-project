@@ -2,7 +2,7 @@ use std::{str::FromStr};
 
 use crate::{
     error::ApiError,
-    models::{self, Listing, Product, User},
+    models::{self, Listing, Product, User, AddressData},
 };
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{NaiveDateTime, Utc};
@@ -145,6 +145,12 @@ pub struct ImageData {
     pub id: Uuid
 }
 
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IdReq {
+    pub id: String
+}
+
 impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
     fn from(data: BoxCreation) -> Self {
         let mut p_vec = vec![];
@@ -210,6 +216,24 @@ impl TryFrom<Register> for User {
             points: 0,
             is_superuser: false,
             orders: vec![],
+            address: None
         })
+    }
+}
+
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AddressDataReq {
+    pub user_id: String,
+    pub address: String
+}
+
+
+impl From<AddressDataReq> for AddressData {
+    fn from(value: AddressDataReq) -> Self {
+        Self {
+            user_id: Uuid::from_str(&value.user_id).unwrap(),
+            address: value.address
+        }
     }
 }

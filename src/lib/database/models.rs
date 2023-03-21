@@ -10,6 +10,7 @@ pub struct User {
     pub id: Uuid,
     pub points: i32,
     pub is_superuser: bool,
+    pub address: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +100,7 @@ impl From<User> for models::ResponseUser {
             owned_products: vec![],
             points: value.points as u32,
             orders: vec![],
+            address: value.address
         }
     }
 }
