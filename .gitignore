@@ -1,2 +1,4 @@
 /target
 /database
+/microservice/payment/env
+/microservice/payment/__pycache__

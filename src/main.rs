@@ -6,7 +6,7 @@ use api::{
         add_product_to_box, auth, create_box, create_listing, delete_box, delete_listing,
         delete_single_product, generate_link, get_all_users, get_image, get_listing_from_id,
         get_listing_hex, get_listing_ich, get_listings, register_user, send_server_status,
-        sign_in_user, buy_box, get_product, update_address
+        sign_in_user, buy_box, get_product, update_address, logout
     },
     State,
 };
@@ -43,6 +43,7 @@ async fn main() {
         .route("/get/listing", post(get_listing_from_id))
         .route("/get/product", post(get_product))
         .route("/update/address", post(update_address))
+        .route("/auth/logout", get(logout))
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
         .layer(

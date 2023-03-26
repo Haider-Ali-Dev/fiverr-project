@@ -29,8 +29,8 @@ use futures::{Stream, TryStreamExt};
 use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{
-    BoxCreation, DeleteListing, Id, IdAndReqId, IdReq, ProductCreation, Register, ReqListing,
-    SignIn, AddressDataReq,
+    AddressDataReq, BoxCreation, DeleteListing, Id, IdAndReqId, IdReq, ProductCreation, Register,
+    ReqListing, SignIn,
 };
 
 pub async fn register_user(
@@ -107,6 +107,7 @@ pub async fn create_listing(
         req_id: String::new(),
     };
     let mut file_name = String::from("database/images/");
+    let mut ext = String::new();
     while let Some(f) = form.next_field().await.unwrap() {
         if let Some(name) = f.name() {
             match name {
@@ -126,7 +127,16 @@ pub async fn create_listing(
                     Some("image/png") => {
                         let id = uuid::Uuid::new_v4().to_string();
                         file_name.push_str(&id);
+                        ext.push_str(&"PNG".to_string());
+
                         stream_to_file(&format!("{id}.png"), f).await.unwrap();
+                    }
+                    Some("image/jpeg") => {
+                        let id = uuid::Uuid::new_v4().to_string();
+                        file_name.push_str(&id);
+                        ext.push_str(&"JPG".to_string());
+                        println!("{}", id);
+                        stream_to_file(&format!("{id}.jpg"), f).await.unwrap();
                     }
                     _ => (),
                 },
@@ -139,6 +149,7 @@ pub async fn create_listing(
     let req_id: ReqId = req_list.into();
     let image_data = ImageData {
         path: file_name,
+        ext,
         id: listing.clone().id,
     };
 
@@ -172,10 +183,10 @@ pub async fn generate_link(
     mut form: Multipart,
 ) -> Result<Json<ImageLink>, ApiError> {
     let id = uuid::Uuid::new_v4();
-
-    let img = ImageData {
+    let mut img = ImageData {
         path: String::new(),
         id: id.clone(),
+        ext: String::new(),
     };
 
     let mut file_name = String::from("database/images/");
@@ -185,7 +196,13 @@ pub async fn generate_link(
                 "file" => match f.content_type() {
                     Some("image/png") => {
                         file_name.push_str(&id.to_string());
+                        img.ext = "PNG".to_string();
                         stream_to_file(&format!("{id}.png"), f).await.unwrap();
+                    }
+                    Some("image/jpeg") => {
+                        file_name.push_str(&id.to_string());
+                        img.ext = "JPG".to_string();
+                        stream_to_file(&format!("{id}.jpg"), f).await.unwrap();
                     }
                     _ => (),
                 },
@@ -284,19 +301,82 @@ pub async fn delete_box(
     let _ = DatabaseHand::delete_box(&pool, box_data.0.clone().into()).await?;
     Ok(Json(DatabaseHand::get_listing(&pool).await?))
 }
-pub async fn get_image(Path(id): Path<String>) -> Result<impl IntoResponse, ApiError> {
-    let (file, raw_path) = match tokio::fs::File::open(format!("database/images/{id}.png")).await {
-        Ok(file) => (file, format!("database/images/{id}.png")),
-        Err(_) => return Err(ApiError::ImageNotFound),
-    };
+pub async fn get_image(
+    Path(id): Path<String>,
+    Extension(data): Extension<Arc<State>>,
+) -> Result<impl IntoResponse, ApiError> {
+    let pool = data.database.pool.clone();
+    println!("{id}");
+    println!(
+        "{:?}",
+        DatabaseHand::get_image_ext(&pool, &Uuid::from_str(&id).unwrap()).await
+    );
+    let mut rp = "database/images/".to_string();
+    let (file, raw_path) =
+        match DatabaseHand::get_image_ext(&pool, &Uuid::from_str(&id).unwrap()).await {
+            Ok(img) => {
+                let file = match tokio::fs::File::open(format!(
+                    "database/images/{id}.{ext}",
+                    id = id,
+                    ext = img.to_lowercase()
+                ))
+                .await
+
+                {
+                    Ok(file) => {
+                        rp = format!("database/images/{id}.{ext}", id = id, ext = img.to_lowercase());
+                        file
+                    },
+                    Err(_) => {
+                        let (path, ext) = DatabaseHand::get_image_p_and_ext(&pool, &Uuid::from_str(&id).unwrap()).await?;
+                        let e = path;
+                        rp = format!("{}.{}", e, ext.to_lowercase());
+                       // Now create raw_path and file from e
+
+                        let file = match tokio::fs::File::open(rp.clone()).await {
+                            Ok(file) => file,
+                            Err(_) => {
+                                dbg!("ERROR HIT 1");
+                                return Err(ApiError::ImageNotFound);
+                            }
+                        };
+                        
+                        file
+                    },
+
+                };
+
+                (
+                    file,
+                   rp
+                )
+            }
+            Err(_) => {
+                dbg!("ERROR HIT 2");
+                return Err(ApiError::ImageNotFound);
+            }
+        };
+
+    // let (file, raw_path) = match tokio::fs::File::open(format!("database/images/{id}.png")).await {
+    //     Ok(file) => (file, format!("database/images/{id}.png")),
+    //     Err(_) => return Err(ApiError::ImageNotFound),
+    // };
     let stream = ReaderStream::new(file);
     let body = StreamBody::new(stream);
+    println!("{:?}", raw_path);
     match raw_path.split('.').collect::<Vec<_>>()[1] {
         "png" => {
             let he = TypedHeader(ContentType::from(mime::IMAGE_PNG));
             return Ok((he, body));
         }
-        _ => Err(ApiError::ImageNotFound),
+        "jpg" => {
+            let he = TypedHeader(ContentType::from(mime::IMAGE_JPEG));
+            return Ok((he, body));
+        }
+        _ => {
+            dbg!("ERROR HIT");
+            Err(ApiError::ImageNotFound)
+        }
     }
 }
 
@@ -342,6 +422,18 @@ pub async fn update_address(
     let pool = data.database.pool.clone();
     let u = DatabaseHand::update_address(&pool, address_data.0.clone().into()).await?;
     Ok(Json(u))
+}
+
+pub async fn logout(
+    Extension(_): Extension<Arc<State>>,
+    cookies: Cookies,
+) -> Result<Json<ServerStatus>, ApiError> {
+    cookies.remove(Cookie::named("session"));
+    Ok(ServerStatus {
+        status: true,
+        message: "Logged out".to_string(),
+    }
+    .into())
 }
 
 // Websocket route which shows realtime logs axum can be used to create websocket routes as well.

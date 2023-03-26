@@ -142,7 +142,8 @@ pub struct BoxCreation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageData {
     pub path: String,
-    pub id: Uuid
+    pub id: Uuid,
+    pub ext : String
 }
 
 
@@ -227,6 +228,8 @@ pub struct AddressDataReq {
     pub user_id: String,
     pub address: String
 }
+
+
 
 
 impl From<AddressDataReq> for AddressData {

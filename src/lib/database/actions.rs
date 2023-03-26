@@ -191,10 +191,10 @@ impl DatabaseHand {
 
     pub async fn get_image(pool: &Pool, id: &Uuid) -> DResult<String> {
         let pool = pool.clone();
-        let image = sqlx::query!("SELECT path FROM images WHERE for_id = $1", id.clone())
+        let image = sqlx::query!("SELECT for_id FROM images WHERE for_id = $1", id.clone())
             .fetch_one(&pool)
             .await?;
-        Ok(image.path)
+        Ok(image.for_id.to_string())
     }
     pub async fn get_listing(pool: &Pool) -> DResult<Vec<Listing>> {
         let mut final_listings: Vec<Listing> = vec![];
@@ -320,9 +320,10 @@ impl DatabaseHand {
                 .execute(&pool)
                 .await?;
                 sqlx::query!(
-                    "INSERT INTO images (path, for_id) VALUES($1, $2)",
+                    "INSERT INTO images (path, for_id, extension) VALUES($1, $2, $3)",
                     data.2.path,
-                    data.2.id
+                    data.2.id,
+                    data.2.ext
                 )
                 .execute(&pool)
                 .await?;
@@ -664,13 +665,29 @@ impl DatabaseHand {
         None
     }
 
+    // Get image path and extension from id and return as tuple
+    pub async fn get_image_p_and_ext(pool: &Pool, id: &Uuid) -> DResult<(String, String)> {
+        let pool = pool.clone();
+        let image = sqlx::query!(
+            "SELECT path, extension FROM images WHERE for_id = $1",
+            id
+        )
+        .fetch_one(&pool)
+        .await?;
+        Ok((image.path, image.extension))
+    }
+
+   
+
+
     pub async fn save_image(pool: &Pool, data: ImageData) -> DResult<String> {
         let pool = pool.clone();
-        let ImageData { id, path } = data;
+        let ImageData { id, path, ext } = data;
         let image = sqlx::query!(
-            "INSERT INTO images(path, for_id) VALUES($1, $2) RETURNING path",
+            "INSERT INTO images(path, for_id, extension) VALUES($1, $2, $3) RETURNING path",
             path,
-            id
+            id,
+            ext
         )
         .fetch_one(&pool)
         .await?;
@@ -778,6 +795,18 @@ impl DatabaseHand {
         
     }
 
+    // Get image extension
+    pub async fn get_image_ext(pool: &Pool, id: &Uuid) -> DResult<String> {
+        let pool = pool.clone();
+        let image = sqlx::query!(
+            "SELECT extension FROM images WHERE for_id = $1",
+            id
+        )
+        .fetch_one(&pool)
+        .await?;
+     
+        Ok(image.extension)
+    }
     // Get product from id 
     
 }
