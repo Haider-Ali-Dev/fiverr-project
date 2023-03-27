@@ -9,6 +9,6 @@ CREATE TABLE products (
     status boolean NOT NULL,
     created_at timestamp NOT NULL,
     amount int NOT NULL,
-    image text NOT NULL
-
+    image text NOT NULL,
+    ini_amount int NOT NULL
 );

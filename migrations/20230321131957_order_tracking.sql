@@ -4,5 +4,6 @@ CREATE TABLE order_tracking (
     status VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     product_id uuid NOT NULL,
+    product_name text NOT NULL,
     user_id uuid NOT NULL
 );

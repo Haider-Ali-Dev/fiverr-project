@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     database::{actions::DatabaseHand, Database},
     error::ApiError,
-    models::{self, ImageLink, Listing, Product, ResponseUser, ServerStatus, User},
+    models::{self, ImageLink, Listing, Product, ResponseUser, ServerStatus, User, Amount, LogData},
     web::{ImageData, ReqId},
     State,
 };
@@ -435,6 +435,24 @@ pub async fn logout(
     }
     .into())
 }
+
+pub async fn add_points(
+    Extension(data): Extension<Arc<State>>,
+    points_data: Json<Amount>,
+) -> Result<Json<ResponseUser>, ApiError> {
+    let pool = data.database.pool.clone();
+    let u = DatabaseHand::add_coins(&pool, &points_data).await?;
+    Ok(Json(u))
+}
+
+pub async fn get_logs(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<LogData>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let logs = DatabaseHand::get_logs(&pool).await?;
+    Ok(Json(logs))
+}
+
 
 // Websocket route which shows realtime logs axum can be used to create websocket routes as well.
 // This route will be used to send logs to the client and make it compatible with the axum

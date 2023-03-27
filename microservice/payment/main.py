@@ -1,12 +1,13 @@
 from fastapi.middleware.cors import CORSMiddleware
 import stripe
 import os
+from datetime import datetime, timezone
 import uuid
 from fastapi import FastAPI
 from pydantic import BaseModel
 import psycopg2
 app = FastAPI()
-API_KEY = os.environ.get('API_KEY')
+API_KEY = 'sk_test_51Mpc0PCf32Q6vHEwGbQDloAFfEfAxqHXZk9MtuP1VZtXKxxOqh06E8MOFFeG6glDDDvXW6MqKUH0OfnkvnLxRQHd00pVgMZsSl'
 stripe.api_key = API_KEY
 
 origins = [
@@ -33,6 +34,7 @@ conn = psycopg2.connect(
 
 class Payment(BaseModel):
     id: str
+    name: str
     email: str
     card_number: str
     expiry_date: str
@@ -44,19 +46,22 @@ class Payment(BaseModel):
 async def payment(data: Payment):
     amount = 0
     if data.tty_of_points == 'BRONZE':
-        amount = 25
+        amount = 2500
     elif data.tty_of_points == 'SILVER':
-        amount = 50
+        amount = 5000
     elif data.tty_of_points == 'GOLD':
         amount = 100
 
+    data.email = 'ebusiness413@gmail.com'
+    data.id = str(uuid.uuid4())
     token = stripe.Token.create(
         card={
             "number": data.card_number,
             "exp_month": data.expiry_date.split('/')[0],
             "exp_year": data.expiry_date.split('/')[1],
             "cvc": data.cvc,
-            "name": data.email
+            "name": data.name
+        
         }
     )
 
@@ -69,10 +74,12 @@ async def payment(data: Payment):
 
     )
 
+
+
     if charge.status == 'succeeded':
         cur = conn.cursor()
-        cur.execute("INSERT INTO payment (id, email, card_number, expiry_date, cvc, tty_of_points, amount) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (data.id, data.email, data.card_number, data.expiry_date, data.cvc, data.tty_of_points, amount))
+        cur.execute("INSERT INTO payments (id, user_email, user_id, created_at, amount, tty_points) VALUES(%s, %s, %s, %s, %s, %s)"
+                    , (str(uuid.uuid4()), data.email, data.id, datetime.now(timezone.utc), amount, data.tty_of_points))
         conn.commit()
         cur.close()
         return {'status': 'success'}

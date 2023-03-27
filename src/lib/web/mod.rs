@@ -88,6 +88,7 @@ pub struct ProductData {
 impl From<ProductData> for Product {
     fn from(p: ProductData) -> Self {
         Self {
+            ini_amount: p.amount,
             available: p.amount,
             amount: p.amount,
             id: Uuid::new_v4(),

@@ -86,7 +86,8 @@ pub struct Product {
     pub created_at: NaiveDateTime,
     pub amount: i32,
     pub available: i32,
-    pub image: String
+    pub image: String,
+    pub ini_amount: i32
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +97,7 @@ pub struct Order {
     pub product_id: Uuid,
     pub created_at: NaiveDateTime,
     pub status: String,
+    pub product_name: String,
     
 }
 

@@ -351,8 +351,8 @@ impl DatabaseHand {
                 for prod in prods {
                     sqlx::query!(
                         "INSERT INTO products
-                    (box_id, title, id, description, level, status, created_at, amount, image)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                    (box_id, title, id, description, level, status, created_at, amount, image, ini_amount)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                         // Remember that prod.box_id is a temporary id so we have
                         // to use `bx.id`
                         bx.id,
@@ -363,7 +363,8 @@ impl DatabaseHand {
                         prod.status,
                         prod.created_at,
                         prod.amount,
-                        prod.image
+                        prod.image,
+                        prod.ini_amount
                     )
                     .execute(&pool)
                     .await?;
@@ -537,8 +538,8 @@ impl DatabaseHand {
                 for product in products {
                     sqlx::query!(
                         "INSERT INTO products
-                (box_id, title, id, description, level, status, created_at, amount, image)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                (box_id, title, id, description, level, status, created_at, amount, image, ini_amount)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                         box_id,
                         product.title,
                         product.id,
@@ -547,7 +548,8 @@ impl DatabaseHand {
                         product.status,
                         product.created_at,
                         product.amount,
-                        product.image
+                        product.image,
+                        product.ini_amount
                     )
                     .execute(&pool)
                     .await?;
@@ -642,6 +644,7 @@ impl DatabaseHand {
                     product_id: prod.id,
                     created_at: t,
                     status: "Pending".to_owned(),
+                    product_name: product.clone().title,
                 };
                 DatabaseHand::add_order(order, &pool).await?;
 
@@ -747,14 +750,16 @@ impl DatabaseHand {
             created_at,
             status,
             product_id,
+            product_name
         } = order;
         sqlx::query!(
-            "INSERT INTO order_tracking(id, user_id, product_id, created_at, status) VALUES($1, $2, $3, $4, $5)",
+            "INSERT INTO order_tracking(id, user_id, product_id, created_at, status, product_name) VALUES($1, $2, $3, $4, $5, $6)",
             id,
             user_id,
             product_id,
             created_at,
             status,
+            product_name
         )
         .execute(&pool)
         .await?;

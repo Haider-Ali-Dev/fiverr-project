@@ -31,6 +31,7 @@ pub struct Box {
 
 #[derive(Debug, Clone)]
 pub struct Product {
+    pub ini_amount: i32,
     pub box_id: Uuid,
     pub title: String,
     pub id: Uuid,
@@ -61,6 +62,7 @@ impl From<Box> for models::Box {
 impl From<Product> for models::Product {
     fn from(value: Product) -> Self {
         Self {
+            ini_amount: value.ini_amount,
             id: value.id,
             box_id: value.box_id,
             title: value.title,
