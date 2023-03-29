@@ -3,10 +3,11 @@ use std::sync::Arc;
 use api::{
     database::Database,
     web::routes::{
-        add_product_to_box, auth, create_box, create_listing, delete_box, delete_listing,
-        delete_single_product, generate_link, get_all_users, get_image, get_listing_from_id,
-        get_listing_hex, get_listing_ich, get_listings, register_user, send_server_status,
-        sign_in_user, buy_box, get_product, update_address, logout, add_points, get_logs
+        add_points, add_product_to_box, auth, buy_box, create_box, create_category, create_listing,
+        delete_box, delete_listing, delete_single_product, generate_link, get_all_users,
+        get_categories, get_image, get_listing_from_id, get_listing_hex, get_listing_ich,
+        get_listings, get_logs, get_product, logout, register_user, send_server_status,
+        sign_in_user, update_address,
     },
     State,
 };
@@ -46,6 +47,8 @@ async fn main() {
         .route("/auth/logout", get(logout))
         .route("/add/points", post(add_points))
         .route("/admin/get/logs", get(get_logs))
+        .route("/admin/create/category", post(create_category))
+        .route("/get/categories", get(get_categories))
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
         .layer(

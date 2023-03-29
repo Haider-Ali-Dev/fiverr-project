@@ -813,7 +813,7 @@ impl DatabaseHand {
         Ok(categories)
     }
 
-
+    
     pub async fn create_category(pool: &Pool, data: &Category) -> DResult<Category> {
         let pool = pool.clone();
         let Category { name, created_at, id } = data;
