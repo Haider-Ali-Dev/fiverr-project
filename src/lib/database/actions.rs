@@ -317,7 +317,7 @@ impl DatabaseHand {
                     &data.0.id,
                     &data.0.tty,
                     &data.0.description,
-                    &data.0.category_id
+                    data.0.category_id
                 )
                 .execute(&pool)
                 .await?;

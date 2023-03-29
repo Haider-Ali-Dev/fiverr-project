@@ -106,7 +106,7 @@ pub async fn create_listing(
         image: String::new(),
         req_id: String::new(),
         description: String::new(),
-        category_id: String::new(),
+        category_id: None,
     };
     let mut file_name = String::from("database/images/");
     let mut ext = String::new();
@@ -131,7 +131,8 @@ pub async fn create_listing(
                 },
                 "category_id" => {
                     let value = f.text().await?;
-                    req_list.category_id = value;
+                     
+                    req_list.category_id = Some(value);
                 },
                 "file" => match f.content_type() {
                     Some("image/png") => {

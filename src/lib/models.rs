@@ -77,7 +77,7 @@ pub struct Listing {
     pub id: Uuid,
     pub title: String,
     pub description: String,
-    pub category_id: Uuid,
+    pub category_id: Option<Uuid>,
     pub created_at: NaiveDateTime,
     pub box_count: u32,
     pub tty: String,

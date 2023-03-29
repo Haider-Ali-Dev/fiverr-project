@@ -20,7 +20,7 @@ pub struct Listing {
     pub created_at: NaiveDateTime,
     pub tty: String,
     pub description: String,
-    pub category_id: Uuid
+    pub category_id: Option<Uuid>
 }
 
 #[derive(Debug, Clone)]

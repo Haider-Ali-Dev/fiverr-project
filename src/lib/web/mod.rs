@@ -1,8 +1,8 @@
-use std::{str::FromStr};
+use std::str::FromStr;
 
 use crate::{
     error::ApiError,
-    models::{self, Listing, Product, User, AddressData, Category},
+    models::{self, AddressData, Category, Listing, Product, User},
 };
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{NaiveDateTime, Utc};
@@ -25,10 +25,7 @@ pub struct IdAndReqId {
 
 impl From<IdAndReqId> for (Uuid, ReqId) {
     fn from(value: IdAndReqId) -> Self {
-        (
-            Uuid::from_str(&value.id).unwrap(),
-            value.req_id.into()
-        )
+        (Uuid::from_str(&value.id).unwrap(), value.req_id.into())
     }
 }
 
@@ -57,15 +54,14 @@ pub struct ReqIdStr {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DeleteListing {
     pub listing_id: String,
-    pub req_id: ReqIdStr
+    pub req_id: ReqIdStr,
 }
-
 
 impl From<DeleteListing> for (Uuid, ReqId) {
     fn from(value: DeleteListing) -> Self {
         (
             Uuid::from_str(&value.listing_id).unwrap(),
-            value.req_id.into()
+            value.req_id.into(),
         )
     }
 }
@@ -76,7 +72,7 @@ pub struct ReqListing {
     pub title: String,
     pub tty: String,
     pub description: String,
-    pub category_id: String,
+    pub category_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -100,7 +96,7 @@ pub struct ProductData {
     pub description: String,
     pub level: u32,
     pub amount: i32,
-    pub image: String
+    pub image: String,
 }
 
 impl From<ProductData> for Product {
@@ -126,7 +122,7 @@ impl From<ProductData> for Product {
 pub struct ProductCreation {
     pub req_id: ReqIdStr,
     pub product_data: Vec<ProductData>,
-    pub box_id: String
+    pub box_id: String,
 }
 
 impl From<ProductCreation> for (Vec<Product>, ReqId, Uuid) {
@@ -140,11 +136,10 @@ impl From<ProductCreation> for (Vec<Product>, ReqId, Uuid) {
         (
             p_vec,
             data.req_id.into(),
-            Uuid::from_str(&data.box_id).unwrap()
+            Uuid::from_str(&data.box_id).unwrap(),
         )
     }
 }
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BoxData {
@@ -163,13 +158,12 @@ pub struct BoxCreation {
 pub struct ImageData {
     pub path: String,
     pub id: Uuid,
-    pub ext : String
+    pub ext: String,
 }
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct IdReq {
-    pub id: String
+    pub id: String,
 }
 
 impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
@@ -184,7 +178,6 @@ impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
             products: vec![],
             total: 0,
             available_products: 0,
-
         };
 
         for prod in &data.box_data.products {
@@ -198,22 +191,38 @@ impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
 impl From<ReqIdStr> for ReqId {
     fn from(value: ReqIdStr) -> Self {
         Self {
-            id: Uuid::from_str(&value.id).unwrap()
+            id: Uuid::from_str(&value.id).unwrap(),
         }
     }
 }
 impl From<ReqListing> for Listing {
     fn from(list: ReqListing) -> Self {
-        Self {
-            image: String::new(),
-            boxes: vec![],
-            id: Uuid::new_v4(),
-            title: list.title,
-            created_at: Utc::now().naive_utc(),
-            box_count: 0,
-            tty: list.tty,
-            description: list.description,
-            category_id: Uuid::from_str(&list.category_id).unwrap(),
+        println!("{:?}", list.category_id);
+        match list.category_id {
+            Some(id) => {
+                return Self {
+                    image: list.image,
+                    boxes: vec![],
+                    id: Uuid::new_v4(),
+                    title: list.title,
+                    created_at: Utc::now().naive_utc(),
+                    box_count: 0,
+                    tty: list.tty,
+                    description: list.description,
+                    category_id: Some(Uuid::from_str(&id).unwrap()),
+                }
+            }
+            None => Self {
+                image: String::new(),
+                boxes: vec![],
+                id: Uuid::new_v4(),
+                title: list.title,
+                created_at: Utc::now().naive_utc(),
+                box_count: 0,
+                tty: list.tty,
+                description: list.description,
+                category_id: None,
+            },
         }
     }
 }
@@ -221,7 +230,7 @@ impl From<ReqListing> for Listing {
 impl From<ReqListing> for ReqId {
     fn from(value: ReqListing) -> Self {
         Self {
-            id: Uuid::from_str(&value.req_id).unwrap()
+            id: Uuid::from_str(&value.req_id).unwrap(),
         }
     }
 }
@@ -241,26 +250,22 @@ impl TryFrom<Register> for User {
             points: 0,
             is_superuser: false,
             orders: vec![],
-            address: None
+            address: None,
         })
     }
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AddressDataReq {
     pub user_id: String,
-    pub address: String
+    pub address: String,
 }
-
-
-
 
 impl From<AddressDataReq> for AddressData {
     fn from(value: AddressDataReq) -> Self {
         Self {
             user_id: Uuid::from_str(&value.user_id).unwrap(),
-            address: value.address
+            address: value.address,
         }
     }
 }
