@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     database::{actions::DatabaseHand, Database},
     error::ApiError,
-    models::{self, ImageLink, Listing, Product, ResponseUser, ServerStatus, User, Amount, LogData},
+    models::{self, ImageLink, Listing, Product, ResponseUser, ServerStatus, User, Amount, LogData, Category},
     web::{ImageData, ReqId},
     State,
 };
@@ -30,7 +30,7 @@ use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{
     AddressDataReq, BoxCreation, DeleteListing, Id, IdAndReqId, IdReq, ProductCreation, Register,
-    ReqListing, SignIn,
+    ReqListing, SignIn, CategoryData,
 };
 
 pub async fn register_user(
@@ -105,6 +105,8 @@ pub async fn create_listing(
         title: String::new(),
         image: String::new(),
         req_id: String::new(),
+        description: String::new(),
+        category_id: String::new(),
     };
     let mut file_name = String::from("database/images/");
     let mut ext = String::new();
@@ -122,7 +124,15 @@ pub async fn create_listing(
                 "tty" => {
                     let value = f.text().await?;
                     req_list.tty = value;
-                }
+                },
+                "description" => {
+                    let value = f.text().await?;
+                    req_list.description = value;
+                },
+                "category_id" => {
+                    let value = f.text().await?;
+                    req_list.category_id = value;
+                },
                 "file" => match f.content_type() {
                     Some("image/png") => {
                         let id = uuid::Uuid::new_v4().to_string();
@@ -451,6 +461,24 @@ pub async fn get_logs(
     let pool = data.database.pool.clone();
     let logs = DatabaseHand::get_logs(&pool).await?;
     Ok(Json(logs))
+}
+
+pub async fn create_category(
+    Extension(data): Extension<Arc<State>>,
+    category_data: Json<CategoryData>,
+) -> Result<Json<Category>, ApiError> {
+    let pool = data.database.pool.clone();
+    let category_data: Category = category_data.0.clone().into();
+    let category = DatabaseHand::create_category(&pool, &category_data).await?;
+    Ok(Json(category))
+}
+
+pub async fn get_categories(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<Category>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let categories = DatabaseHand::get_categories(&pool).await?;
+    Ok(Json(categories))
 }
 
 

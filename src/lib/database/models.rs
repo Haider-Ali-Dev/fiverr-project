@@ -18,7 +18,9 @@ pub struct Listing {
     pub id: Uuid,
     pub title: String,
     pub created_at: NaiveDateTime,
-    pub tty: String
+    pub tty: String,
+    pub description: String,
+    pub category_id: Uuid
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +29,7 @@ pub struct Box {
     pub price: i32,
     pub listing_id: Uuid,
     pub created_at: NaiveDateTime,
+    pub original_price: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +59,7 @@ impl From<Box> for models::Box {
             products: vec![],
             total: 0,
             available_products: 0,
+            original_price: value.original_price as u32
         }
     }
 }
@@ -86,7 +90,9 @@ impl From<Listing> for models::Listing {
             created_at: value.created_at,
             box_count: 0,
             image: "".to_owned(),
-            tty: value.tty
+            tty: value.tty,
+            description: value.description,
+            category_id: value.category_id
         }
     }
 }

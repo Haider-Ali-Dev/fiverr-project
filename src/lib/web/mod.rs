@@ -2,7 +2,7 @@ use std::{str::FromStr};
 
 use crate::{
     error::ApiError,
-    models::{self, Listing, Product, User, AddressData},
+    models::{self, Listing, Product, User, AddressData, Category},
 };
 use bcrypt::{hash, DEFAULT_COST};
 use chrono::{NaiveDateTime, Utc};
@@ -74,8 +74,26 @@ pub struct ReqListing {
     pub req_id: String,
     pub image: String,
     pub title: String,
-    pub tty: String
+    pub tty: String,
+    pub description: String,
+    pub category_id: String,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CategoryData {
+    pub name: String,
+}
+
+impl From<CategoryData> for Category {
+    fn from(c: CategoryData) -> Self {
+        Self {
+            created_at: Utc::now().naive_utc(),
+            id: Uuid::new_v4(),
+            name: c.name,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProductData {
     pub title: String,
@@ -131,6 +149,7 @@ impl From<ProductCreation> for (Vec<Product>, ReqId, Uuid) {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BoxData {
     pub price: u32,
+    pub original_price: u32,
     pub listing_id: String,
     pub products: Vec<ProductData>,
 }
@@ -157,6 +176,7 @@ impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
     fn from(data: BoxCreation) -> Self {
         let mut p_vec = vec![];
         let bx = models::Box {
+            original_price: data.box_data.original_price,
             id: Uuid::new_v4(),
             price: data.box_data.price,
             listing_id: Uuid::from_str(&data.box_data.listing_id).unwrap(),
@@ -164,6 +184,7 @@ impl From<BoxCreation> for (models::Box, Vec<Product>, ReqId) {
             products: vec![],
             total: 0,
             available_products: 0,
+
         };
 
         for prod in &data.box_data.products {
@@ -190,7 +211,9 @@ impl From<ReqListing> for Listing {
             title: list.title,
             created_at: Utc::now().naive_utc(),
             box_count: 0,
-            tty: list.tty
+            tty: list.tty,
+            description: list.description,
+            category_id: Uuid::from_str(&list.category_id).unwrap(),
         }
     }
 }

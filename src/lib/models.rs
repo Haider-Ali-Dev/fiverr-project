@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub struct Box {
     pub id: Uuid,
     pub price: u32,
+    pub original_price: u32,
     pub listing_id: Uuid,
     pub created_at: NaiveDateTime,
     pub products: Vec<Product>,
@@ -62,7 +63,12 @@ pub struct ProductIdent {
     pub total: u32,
 }
 
-
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Category {
+    pub id: Uuid,
+    pub name: String,
+    pub created_at: NaiveDateTime,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Listing {
@@ -70,6 +76,8 @@ pub struct Listing {
     pub boxes: Vec<Box>,
     pub id: Uuid,
     pub title: String,
+    pub description: String,
+    pub category_id: Uuid,
     pub created_at: NaiveDateTime,
     pub box_count: u32,
     pub tty: String,

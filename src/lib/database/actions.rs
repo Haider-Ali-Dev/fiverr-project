@@ -1,6 +1,6 @@
 use crate::{
     error::ApiError,
-    models::{Amount, Box, Listing, LogData, Order, Product, ProductIdent, ResponseUser, User, AddressData},
+    models::{Amount, Box, Listing, LogData, Order, Product, ProductIdent, ResponseUser, User, AddressData, Category},
     web::{ImageData, ReqId, SignIn},
 };
 use chrono::Utc;
@@ -311,11 +311,13 @@ impl DatabaseHand {
         match DatabaseHand::confirm_user_privilege(&pool, &data.1).await {
             Ok(true) => {
                 sqlx::query!(
-                    "INSERT INTO listing (title, created_at, id, tty) VALUES($1, $2, $3, $4)",
+                    "INSERT INTO listing (title, created_at, id, tty, description, category_id) VALUES($1, $2, $3, $4, $5, $6)",
                     &data.0.title,
                     &data.0.created_at,
                     &data.0.id,
-                    &data.0.tty
+                    &data.0.tty,
+                    &data.0.description,
+                    &data.0.category_id
                 )
                 .execute(&pool)
                 .await?;
@@ -340,11 +342,12 @@ impl DatabaseHand {
         match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
             Ok(true) => {
                 sqlx::query!(
-                    "INSERT INTO box (id, price, listing_id, created_at) VALUES ($1, $2, $3, $4) ",
+                    "INSERT INTO box (id, price, listing_id, created_at, original_price) VALUES ($1, $2, $3, $4, $5) ",
                     bx.id,
                     bx.price as i32,
                     bx.listing_id,
-                    bx.created_at
+                    bx.created_at,
+                    bx.original_price as i32
                 )
                 .execute(&pool)
                 .await?;
@@ -579,6 +582,14 @@ impl DatabaseHand {
             .into();
         Ok(product)
     }
+    // Get product amount from product's id
+    pub async fn get_product_amount(pool: &Pool, product_id: &Uuid) -> DResult<i32> {
+        let pool = pool.clone();
+        let amount = sqlx::query!("SELECT amount FROM products WHERE id = $1", product_id)
+            .fetch_one(&pool)
+            .await?;
+        Ok(amount.amount)
+    }
     pub async fn buy_box(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Product> {
         let (box_id, req_id) = data;
         let pool = pool.clone();
@@ -613,10 +624,21 @@ impl DatabaseHand {
         let prod = DatabaseHand::select_weighted_random_product(&products_idents);
         match prod {
             Some(prod) => {
-                // Setting the status to true
-                sqlx::query!("UPDATE products SET status = true WHERE id = $1", &prod.id)
+                sqlx::query!(
+                    "UPDATE products SET amount = amount - 1 WHERE id = $1",
+                    &prod.id
+                )
+                .execute(&pool)
+                .await?;
+                
+                if DatabaseHand::get_product_amount(&pool, &prod.id).await? == 0 {
+                    sqlx::query!(
+                        "UPDATE products SET status = true WHERE id = $1",
+                        &prod.id
+                    )
                     .execute(&pool)
                     .await?;
+                }
 
                 // Adding the product purchase to products_owned
                 let t = Utc::now().naive_utc();
@@ -631,12 +653,7 @@ impl DatabaseHand {
                 .execute(&pool)
                 .await?;
 
-                sqlx::query!(
-                    "UPDATE products SET amount = amount - 1 WHERE id = $1",
-                    &prod.id
-                )
-                .execute(&pool)
-                .await?;
+                
                 let product = DatabaseHand::get_single_product(&pool, &prod.id).await?;
                 let order = Order {
                     id: Uuid::new_v4(),
@@ -786,6 +803,30 @@ impl DatabaseHand {
             .fetch_all(&pool)
             .await?;
         Ok(orders)
+    }
+
+    pub async fn get_categories(pool: &Pool) -> DResult<Vec<Category>> {
+        let pool = pool.clone();
+        let categories = sqlx::query_as!(Category, "SELECT * FROM category")
+            .fetch_all(&pool)
+            .await?;
+        Ok(categories)
+    }
+
+
+    pub async fn create_category(pool: &Pool, data: &Category) -> DResult<Category> {
+        let pool = pool.clone();
+        let Category { name, created_at, id } = data;
+        let category = sqlx::query_as!(
+            Category,
+            "INSERT INTO category(name, created_at, id) VALUES($1, $2, $3) RETURNING *",
+            name,
+            created_at,
+            id
+        )
+        .fetch_one(&pool)
+        .await?;
+        Ok(category)
     }
 
     // Update address by user's id and return the user
