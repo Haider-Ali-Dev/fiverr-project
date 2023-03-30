@@ -813,6 +813,8 @@ impl DatabaseHand {
         Ok(categories)
     }
 
+    // Get i
+
     
     pub async fn create_category(pool: &Pool, data: &Category) -> DResult<Category> {
         let pool = pool.clone();
@@ -840,6 +842,24 @@ impl DatabaseHand {
         Ok(user)
         
     }
+
+    pub async fn get_random_listings(pool: &Pool) -> DResult<Vec<Listing>> {
+        let pool = pool.clone();
+        let listings = sqlx::query_as!(DListing, "SELECT * FROM listing ORDER BY RANDOM() LIMIT 4")
+            .fetch_all(&pool)
+            .await?;
+        let mut listings: Vec<Listing> = listings.into_iter().map(|l| l.into()).collect();
+        for listing in &mut listings {
+            let listing_image = DatabaseHand::get_image(&pool, &listing.id).await?;
+            let ed_img = listing_image.split('/').collect::<Vec<_>>();
+            listing.image = BASE_URL.to_owned() + "/get/image/" + ed_img.last().unwrap();
+            let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing.id).await?;
+            listing.box_count = bxs.len() as u32;
+            listing.boxes = bxs;
+        }
+        Ok(listings)
+    }
+
 
     // Get image extension
     pub async fn get_image_ext(pool: &Pool, id: &Uuid) -> DResult<String> {

@@ -250,6 +250,25 @@ pub async fn create_box(
     }
 }
 
+pub async fn get_random_listings(
+    Extension(data): Extension<Arc<State>>,
+) -> Result<Json<Vec<models::Listing>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let listings = DatabaseHand::get_random_listings(&pool).await?;
+    Ok(Json(listings))
+}
+
+
+pub async fn get_boxes(
+    Extension(data): Extension<Arc<State>>,
+    Path(id): Path<String>
+) -> Result<Json<Vec<models::Box>>, ApiError> {
+    let pool = data.database.pool.clone();
+    let id = Uuid::from_str(&id).unwrap();
+    let boxes = DatabaseHand::get_boxes_of_listing(&pool, &id).await?;
+    Ok(Json(boxes))
+}
+
 pub async fn delete_listing(
     Extension(data): Extension<Arc<State>>,
     listing_data: Json<DeleteListing>,

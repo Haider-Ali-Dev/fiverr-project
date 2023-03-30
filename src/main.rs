@@ -7,7 +7,7 @@ use api::{
         delete_box, delete_listing, delete_single_product, generate_link, get_all_users,
         get_categories, get_image, get_listing_from_id, get_listing_hex, get_listing_ich,
         get_listings, get_logs, get_product, logout, register_user, send_server_status,
-        sign_in_user, update_address,
+        sign_in_user, update_address, get_boxes, get_random_listings,
     },
     State,
 };
@@ -49,6 +49,8 @@ async fn main() {
         .route("/admin/get/logs", get(get_logs))
         .route("/admin/create/category", post(create_category))
         .route("/get/categories", get(get_categories))
+        .route("/get/boxes/:id", get(get_boxes))
+        .route("/get/random/listings", get(get_random_listings))
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
         .layer(
