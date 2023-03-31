@@ -7,7 +7,7 @@ use api::{
         delete_box, delete_listing, delete_single_product, generate_link, get_all_users,
         get_categories, get_image, get_listing_from_id, get_listing_hex, get_listing_ich,
         get_listings, get_logs, get_product, logout, register_user, send_server_status,
-        sign_in_user, update_address, get_boxes, get_random_listings,
+        sign_in_user, update_address, get_boxes, get_random_listings, hello_world,
     },
     State,
 };
@@ -21,9 +21,10 @@ use tower_http::cors::{CorsLayer, Origin};
 
 #[tokio::main]
 async fn main() {
-    let database = Database::new("postgres://haider:@localhost:5432/ichinbankuji").await;
+    let database = Database::new("postgres://postgres:haider@localhost:5432/ichinbankuji").await;
     let state = State { database };
     let router = Router::new()
+        .route("/", get(hello_world))
         .route("/auth/register", post(register_user))
         .route("/auth/signin", post(sign_in_user))
         .route("/admin/create/listing", post(create_listing))
@@ -55,7 +56,7 @@ async fn main() {
         .layer(CookieManagerLayer::new())
         .layer(
             CorsLayer::new()
-                .allow_origin(Origin::exact("http://localhost:4200".parse().unwrap()))
+                .allow_origin(Origin::exact("https://ichiban-kuji-frontend.vercel.app".parse().unwrap()))                
                 .allow_methods(vec![Method::GET, Method::POST])
                 .allow_credentials(true)
                 .allow_headers(vec![CONTENT_TYPE]),

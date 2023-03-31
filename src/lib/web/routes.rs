@@ -250,6 +250,11 @@ pub async fn create_box(
     }
 }
 
+// A test route which says Hello World
+pub async fn hello_world() -> Result<Json<String>, ApiError> {
+    Ok(Json("Hello World".to_string()))
+}
+
 pub async fn get_random_listings(
     Extension(data): Extension<Arc<State>>,
 ) -> Result<Json<Vec<models::Listing>>, ApiError> {

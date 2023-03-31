@@ -11,8 +11,9 @@ API_KEY = 'sk_test_51Mpc0PCf32Q6vHEwGbQDloAFfEfAxqHXZk9MtuP1VZtXKxxOqh06E8MOFFeG
 stripe.api_key = API_KEY
 
 origins = [
-    'http://localhost:3000',
-    'http://localhost:4200'
+   'https://fms.software',
+   'https://api.fms.software',
+   'https://ichiban-kuji-frontend.vercel.app'
 ]
 
 app.add_middleware(
