@@ -11,6 +11,7 @@ use headers::ContentType;
 use tower_cookies::{Cookie, Cookies};
 use tungstenite::{Message, WebSocket};
 use uuid::Uuid;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
     database::{actions::DatabaseHand, Database},

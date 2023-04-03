@@ -4,10 +4,10 @@ use api::{
     database::Database,
     web::routes::{
         add_points, add_product_to_box, auth, buy_box, create_box, create_category, create_listing,
-        delete_box, delete_listing, delete_single_product, generate_link, get_all_users,
+        delete_box, delete_listing, delete_single_product, generate_link, get_all_users, get_boxes,
         get_categories, get_image, get_listing_from_id, get_listing_hex, get_listing_ich,
-        get_listings, get_logs, get_product, logout, register_user, send_server_status,
-        sign_in_user, update_address, get_boxes, get_random_listings, hello_world,
+        get_listings, get_logs, get_product, get_random_listings, hello_world, logout,
+        register_user, send_server_status, sign_in_user, update_address,
     },
     State,
 };
@@ -17,8 +17,8 @@ use axum::{
     Extension, Router, Server,
 };
 use tower_cookies::CookieManagerLayer;
-use tower_http::cors::{CorsLayer, Origin};
-
+use tower_http::cors::Origin;
+use tower_http::cors::{Any, CorsLayer};
 #[tokio::main]
 async fn main() {
     let database = Database::new("postgres://postgres:haider@localhost:5432/ichinbankuji").await;
@@ -54,12 +54,18 @@ async fn main() {
         .route("/get/random/listings", get(get_random_listings))
         .layer(Extension(Arc::new(state)))
         .layer(CookieManagerLayer::new())
+        // Cors to allow all origins
         .layer(
             CorsLayer::new()
-                .allow_origin(Origin::exact("https://ichiban-kuji-frontend.vercel.app".parse().unwrap()))                
-                .allow_methods(vec![Method::GET, Method::POST])
-                .allow_credentials(true)
-                .allow_headers(vec![CONTENT_TYPE]),
+                .allow_origin(Origin::exact(
+                    "http://localhost:4200".to_string().parse().unwrap(),
+                ))
+                .allow_origin(Origin::exact(
+                    "http://localhost:4000".to_string().parse().unwrap(),
+                ))
+                .allow_methods(vec![Method::GET, Method::POST, Method::DELETE, Method::PUT])
+                .allow_headers(vec![CONTENT_TYPE])
+                .allow_credentials(true),
         );
 
     match Server::bind(&"0.0.0.0:3000".parse().unwrap())
