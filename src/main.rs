@@ -60,10 +60,7 @@ async fn main() {
                 .allow_origin(Origin::exact(
                     "http://localhost:4200".to_string().parse().unwrap(),
                 ))
-                .allow_origin(Origin::exact(
-                    "http://localhost:4000".to_string().parse().unwrap(),
-                ))
-                .allow_methods(vec![Method::GET, Method::POST, Method::DELETE, Method::PUT])
+                .allow_methods(vec![Method::GET, Method::POST])
                 .allow_headers(vec![CONTENT_TYPE])
                 .allow_credentials(true),
         );

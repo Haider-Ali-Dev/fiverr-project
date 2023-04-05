@@ -476,18 +476,35 @@ impl DatabaseHand {
     pub async fn delete_product(pool: &Pool, data: (Uuid, ReqId)) -> DResult<Vec<Listing>> {
         let (product_id, req_id) = data;
         let pool = pool.clone();
+        println!("{:?}", req_id);
         match DatabaseHand::confirm_user_privilege(&pool, &req_id).await {
             Ok(true) => {
+                let product_e = DatabaseHand::get_single_product(&pool, &product_id).await?;
                 let box_id = sqlx::query!("SELECT box_id FROM products WHERE id = $1", product_id)
                     .fetch_one(&pool)
                     .await?;
-                sqlx::query!("DELETE FROM products WHERE id = $1", product_id)
-                    .execute(&pool)
-                    .await?;
+                // sqlx::query!("DELETE FROM products WHERE id = $1", product_id)
+                //     .execute(&pool)
+                //     .await?;
                 let listing_id =
                     sqlx::query!("SELECT listing_id FROM box WHERE id = $1", box_id.box_id)
                         .fetch_one(&pool)
                         .await?;
+
+                // Get boxes of listing
+                let bxs = DatabaseHand::get_boxes_of_listing(&pool, &listing_id.listing_id).await?;
+
+                for bx in bxs {
+                    for product in bx.products {
+                        if product.title == product_e.title {
+                            
+                            sqlx::query!("DELETE FROM products WHERE id = $1", product.id)
+                                .execute(&pool)
+                                .await?;
+                        }
+                    }
+                }
+
                 let listings = DatabaseHand::get_listing(&pool).await?;
                 DatabaseHand::add_log(
                     &pool,
